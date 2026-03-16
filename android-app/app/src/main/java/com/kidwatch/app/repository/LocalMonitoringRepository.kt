@@ -3,8 +3,11 @@ package com.kidwatch.app.repository
 import android.content.Context
 import com.kidwatch.app.data.local.KidWatchDatabase
 import com.kidwatch.app.data.local.entity.AppUsageEntity
+import com.kidwatch.app.data.local.entity.ContentAnalysisEntity
 import com.kidwatch.app.data.local.entity.SyncQueueEntity
 import com.kidwatch.app.data.local.entity.VideoEventEntity
+import com.kidwatch.app.insights.OpenAiContentAnalyzer
+import org.json.JSONArray
 import org.json.JSONObject
 
 class LocalMonitoringRepository(
@@ -80,6 +83,53 @@ class LocalMonitoringRepository(
             put("topVideos", JSONObject(topVideos))
         }.toString()
         enqueueSummary("content_summary", payload)
+    }
+
+    suspend fun saveContentAnalysis(dateKey: String, deviceId: String, analyses: List<OpenAiContentAnalyzer.AnalysisResult>) {
+        if (analyses.isEmpty()) return
+        val createdAt = System.currentTimeMillis()
+        database.contentAnalysisDao().insertAll(
+            analyses.map {
+                ContentAnalysisEntity(
+                    dateKey = dateKey,
+                    deviceId = deviceId,
+                    channel = it.channel,
+                    label = it.label,
+                    reason = it.reason,
+                    model = "gpt-4o-mini",
+                    createdAt = createdAt
+                )
+            }
+        )
+    }
+
+    suspend fun enqueueContentAnalysis(
+        dateKey: String,
+        deviceId: String,
+        analyses: List<OpenAiContentAnalyzer.AnalysisResult>
+    ) {
+        if (analyses.isEmpty()) return
+        val assessments = JSONArray()
+        analyses.forEach { assessment ->
+            assessments.put(
+                JSONObject().apply {
+                    put("channel", assessment.channel)
+                    put("label", assessment.label)
+                    put("reason", assessment.reason)
+                }
+            )
+        }
+
+        val payload = JSONObject().apply {
+            put("date", dateKey)
+            put("deviceId", deviceId)
+            put("assessments", assessments)
+        }.toString()
+        enqueueSummary("content_analysis", payload)
+    }
+
+    suspend fun getContentAnalysisForDate(dateKey: String): List<ContentAnalysisEntity> {
+        return database.contentAnalysisDao().getForDate(dateKey)
     }
 
     suspend fun getPendingSync() = database.syncQueueDao().getPending()

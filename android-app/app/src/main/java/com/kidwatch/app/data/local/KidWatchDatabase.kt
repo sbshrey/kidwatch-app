@@ -5,10 +5,12 @@ import androidx.room.Database
 import androidx.room.Room
 import androidx.room.RoomDatabase
 import com.kidwatch.app.data.local.dao.AppUsageDao
+import com.kidwatch.app.data.local.dao.ContentAnalysisDao
 import com.kidwatch.app.data.local.dao.SyncQueueDao
 import com.kidwatch.app.data.local.dao.UserDetectionDao
 import com.kidwatch.app.data.local.dao.VideoEventsDao
 import com.kidwatch.app.data.local.entity.AppUsageEntity
+import com.kidwatch.app.data.local.entity.ContentAnalysisEntity
 import com.kidwatch.app.data.local.entity.SyncQueueEntity
 import com.kidwatch.app.data.local.entity.UserDetectionEntity
 import com.kidwatch.app.data.local.entity.VideoEventEntity
@@ -18,9 +20,10 @@ import com.kidwatch.app.data.local.entity.VideoEventEntity
         AppUsageEntity::class,
         VideoEventEntity::class,
         UserDetectionEntity::class,
-        SyncQueueEntity::class
+        SyncQueueEntity::class,
+        ContentAnalysisEntity::class
     ],
-    version = 1,
+    version = 2,
     exportSchema = false
 )
 abstract class KidWatchDatabase : RoomDatabase() {
@@ -29,6 +32,7 @@ abstract class KidWatchDatabase : RoomDatabase() {
     abstract fun videoEventsDao(): VideoEventsDao
     abstract fun userDetectionDao(): UserDetectionDao
     abstract fun syncQueueDao(): SyncQueueDao
+    abstract fun contentAnalysisDao(): ContentAnalysisDao
 
     companion object {
         @Volatile

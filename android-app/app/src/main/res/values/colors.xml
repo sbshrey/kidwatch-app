@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <color name="kw_primary">#2563EB</color>
+    <color name="kw_on_primary">#FFFFFF</color>
+    <color name="kw_primary_container">#DBEAFE</color>
+    <color name="kw_on_primary_container">#0B2A6B</color>
+
+    <color name="kw_secondary">#4F46E5</color>
+    <color name="kw_on_secondary">#FFFFFF</color>
+
+    <color name="kw_surface">#F8FAFC</color>
+    <color name="kw_on_surface">#0F172A</color>
+    <color name="kw_surface_variant">#E2E8F0</color>
+    <color name="kw_on_surface_variant">#475569</color>
+    <color name="kw_outline_variant">#CBD5E1</color>
+</resources>

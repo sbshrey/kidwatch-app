@@ -5,5 +5,6 @@ data class DashboardUiState(
     val totalUsageMinutes: Int = 0,
     val topAppsText: String = "",
     val deviceUsageText: String = "",
+    val lastUpdatedAtMillis: Long? = null,
     val errorMessage: String? = null
 )

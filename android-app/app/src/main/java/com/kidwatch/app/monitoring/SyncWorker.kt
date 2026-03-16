@@ -42,6 +42,16 @@ class SyncWorker(
                             topVideos = payload.topVideos
                         )
                     }
+
+                    "content_analysis" -> {
+                        val payload = syncService.parseContentAnalysisPayload(item.payloadJson)
+                        syncService.uploadContentAnalysis(
+                            familyId = userId,
+                            deviceId = payload.deviceId,
+                            dateKey = payload.dateKey,
+                            assessments = payload.assessments
+                        )
+                    }
                 }
                 repository.markSyncDone(item.id)
             }.onFailure {

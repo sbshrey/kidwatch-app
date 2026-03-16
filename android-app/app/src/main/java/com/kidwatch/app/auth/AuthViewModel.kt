@@ -9,12 +9,14 @@ import com.kidwatch.app.repository.AuthRepository
 import com.kidwatch.app.repository.LocalMonitoringRepository
 import com.kidwatch.app.services.DeviceInfoProvider
 import com.kidwatch.app.services.FirestoreDeviceService
+import com.kidwatch.app.services.FirestoreFamilyService
 import com.kidwatch.app.services.FirestoreUserService
 import kotlinx.coroutines.launch
 
 class AuthViewModel(
     private val authRepository: AuthRepository,
     private val firestoreUserService: FirestoreUserService,
+    private val firestoreFamilyService: FirestoreFamilyService,
     private val firestoreDeviceService: FirestoreDeviceService,
     private val deviceInfoProvider: DeviceInfoProvider,
     private val localMonitoringRepository: LocalMonitoringRepository
@@ -37,6 +39,7 @@ class AuthViewModel(
             runCatching {
                 val firebaseUser = authRepository.signInWithGoogleIdToken(idToken)
                 firestoreUserService.upsertUser(firebaseUser)
+                firestoreFamilyService.ensureFamilyAndMembership(firebaseUser)
 
                 val deviceInfo = deviceInfoProvider.getDeviceInfo()
                 firestoreDeviceService.ensureDeviceRegistered(

@@ -56,6 +56,34 @@ class FirestoreSyncService(
         doc.set(payload, SetOptions.merge()).await()
     }
 
+    suspend fun uploadContentAnalysis(
+        familyId: String,
+        deviceId: String,
+        dateKey: String,
+        assessments: List<ContentAssessment>
+    ) {
+        val doc = firestore.collection("families")
+            .document(familyId)
+            .collection("devices")
+            .document(deviceId)
+            .collection("contentAnalysis")
+            .document(dateKey)
+
+        val channelsMap = assessments.associate { assessment ->
+            assessment.channel to mapOf(
+                "label" to assessment.label,
+                "reason" to assessment.reason
+            )
+        }
+
+        val payload = mapOf(
+            "date" to dateKey,
+            "deviceId" to deviceId,
+            "channels" to channelsMap
+        )
+        doc.set(payload, SetOptions.merge()).await()
+    }
+
     fun parseDailyUsagePayload(json: String): DailyUsagePayload {
         val root = JSONObject(json)
         val date = root.getString("date")
@@ -84,6 +112,23 @@ class FirestoreSyncService(
         return ContentSummaryPayload(date, deviceId, channels, videos)
     }
 
+    fun parseContentAnalysisPayload(json: String): ContentAnalysisPayload {
+        val root = JSONObject(json)
+        val date = root.getString("date")
+        val deviceId = root.getString("deviceId")
+        val assessmentsArray = root.optJSONArray("assessments") ?: org.json.JSONArray()
+        val assessments = mutableListOf<ContentAssessment>()
+        for (index in 0 until assessmentsArray.length()) {
+            val item = assessmentsArray.optJSONObject(index) ?: continue
+            assessments += ContentAssessment(
+                channel = item.optString("channel", "Unknown"),
+                label = item.optString("label", "unknown"),
+                reason = item.optString("reason", "")
+            )
+        }
+        return ContentAnalysisPayload(date, deviceId, assessments)
+    }
+
     private fun sanitizeKey(raw: String): String = raw.replace(".", "_")
 
     data class DailyUsagePayload(
@@ -97,5 +142,17 @@ class FirestoreSyncService(
         val deviceId: String,
         val topChannels: Map<String, Int>,
         val topVideos: Map<String, Int>
+    )
+
+    data class ContentAnalysisPayload(
+        val dateKey: String,
+        val deviceId: String,
+        val assessments: List<ContentAssessment>
+    )
+
+    data class ContentAssessment(
+        val channel: String,
+        val label: String,
+        val reason: String
     )
 }
