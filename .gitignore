@@ -1,0 +1,29 @@
+# OS / editor
+.DS_Store
+Thumbs.db
+.idea/
+*.iml
+
+# Logs
+*.log
+
+# Android / Gradle build outputs
+**/build/
+**/.gradle/
+android-app/.gradle/
+
+# Local machine configuration
+android-app/local.properties
+android-app/.android/
+
+# Keystores / signing
+*.jks
+*.keystore
+
+# Firebase config (local-only; keep out of git)
+android-app/app/google-services.json
+
+# Optional: keep if generated later
+android-app/captures/
+android-app/.externalNativeBuild/
+android-app/.cxx/
