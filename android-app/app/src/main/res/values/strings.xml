@@ -1,3 +1,24 @@
 <resources>
     <string name="app_name">KidWatch</string>
+    <string name="auth_sign_in_google">Sign in with Google</string>
+    <string name="auth_sign_out">Sign out</string>
+    <string name="auth_signed_out">Signed out</string>
+    <string name="auth_signed_in">Signed in as %1$s</string>
+    <string name="auth_sign_in_success">Sign in successful</string>
+    <string name="auth_google_token_error">Google sign-in failed. Please try again.</string>
+    <string name="accessibility_service_name">KidWatch YouTube Monitor</string>
+    <string name="accessibility_service_description">Captures YouTube title/channel metadata for child safety summaries.</string>
+    <string name="grant_usage_access">Grant usage access</string>
+    <string name="dashboard_today_usage">Today total usage: %1$d min</string>
+    <string name="dashboard_top_apps">Top apps: %1$s</string>
+    <string name="dashboard_device_usage">Device usage source: %1$s</string>
+    <string name="dashboard_today_usage_label">Today total usage</string>
+    <string name="dashboard_top_apps_label">Top apps</string>
+    <string name="dashboard_device_usage_label">Device usage</string>
+    <string name="dashboard_loading">Loading dashboard…</string>
+    <string name="dashboard_unavailable">Dashboard data unavailable</string>
+    <string name="run_monitoring_now">Run monitoring now</string>
+    <string name="run_sync_now">Sync now</string>
+    <string name="run_now_enqueued">Task queued</string>
+    <string name="sign_in_required">Please sign in first</string>
 </resources>
