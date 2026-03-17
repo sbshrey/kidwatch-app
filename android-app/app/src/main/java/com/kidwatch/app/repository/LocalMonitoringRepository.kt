@@ -53,7 +53,7 @@ class LocalMonitoringRepository(
         )
     }
 
-    suspend fun saveVideoEvent(title: String, channel: String, timestamp: Long) {
+    suspend fun saveVideoEvent(title: String, channel: String, timestamp: Long, faceDetected: Boolean = false) {
         if (title.isBlank() && channel.isBlank()) return
         val latest = database.videoEventsDao().getLatest()
         if (
@@ -68,7 +68,8 @@ class LocalMonitoringRepository(
             VideoEventEntity(
                 title = title.ifBlank { "Unknown" },
                 channel = channel.ifBlank { "Unknown" },
-                timestamp = timestamp
+                timestamp = timestamp,
+                faceDetected = faceDetected
             )
         )
     }

@@ -7,7 +7,12 @@
     <string name="section_top_apps">Top apps</string>
     <string name="section_content_insights">Content insights</string>
     <string name="nav_dashboard">Dashboard</string>
+    <string name="nav_activity">Activity</string>
     <string name="nav_family_dashboard">Family</string>
+    <string name="dashboard_toggle_my">My</string>
+    <string name="dashboard_toggle_family">Family</string>
+    <string name="activity_title">Activity</string>
+    <string name="activity_subtitle">Content insights from accessibility service</string>
     <string name="nav_profile">Profile</string>
     <string name="kpi_screen_time_placeholder">Screen: 0m</string>
     <string name="kpi_sessions_placeholder">Sessions: 0</string>
@@ -114,4 +119,8 @@
     <string name="run_monitoring_now">Run monitoring now</string>
     <string name="run_sync_now">Sync now</string>
     <string name="run_now_enqueued">Task queued</string>
+    <string name="face_capture_channel_name">Face capture</string>
+    <string name="face_capture_channel_desc">Detects viewer when watching content</string>
+    <string name="face_capture_notification_title">KidWatch</string>
+    <string name="face_capture_notification_text">Viewing detection active</string>
 </resources>

@@ -23,7 +23,7 @@ import com.kidwatch.app.data.local.entity.VideoEventEntity
         SyncQueueEntity::class,
         ContentAnalysisEntity::class
     ],
-    version = 2,
+    version = 3,
     exportSchema = false
 )
 abstract class KidWatchDatabase : RoomDatabase() {

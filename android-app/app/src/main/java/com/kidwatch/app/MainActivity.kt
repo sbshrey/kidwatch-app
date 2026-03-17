@@ -5,13 +5,13 @@ import android.graphics.Bitmap
 import android.os.Bundle
 import android.util.Log
 import android.view.View
-import android.widget.LinearLayout
+import android.widget.ImageButton
 import android.widget.ImageView
+import android.widget.LinearLayout
 import android.widget.TextView
 import android.widget.Toast
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.appcompat.app.AppCompatActivity
-import androidx.appcompat.widget.AppCompatButton
 import androidx.lifecycle.lifecycleScope
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
@@ -34,6 +34,7 @@ import com.kidwatch.app.repository.DashboardRepository
 import com.kidwatch.app.repository.LocalMonitoringRepository
 import com.kidwatch.app.services.DeviceInfoProvider
 import com.kidwatch.app.services.DeviceLinkingService
+import com.kidwatch.app.services.FaceCaptureService
 import com.kidwatch.app.services.UsageAccessHelper
 import com.kidwatch.app.ui.DashboardUiState
 import com.kidwatch.app.ui.DashboardViewModel
@@ -50,9 +51,6 @@ class MainActivity : AppCompatActivity() {
     private lateinit var dashboardViewModel: DashboardViewModel
     private lateinit var dashboardRepository: DashboardRepository
 
-    private lateinit var usageAccessButton: AppCompatButton
-    private lateinit var runMonitoringNowButton: AppCompatButton
-    private lateinit var runSyncNowButton: AppCompatButton
     private lateinit var localMonitoringRepository: LocalMonitoringRepository
     private lateinit var titleText: TextView
     private lateinit var dashboardStatusText: TextView
@@ -61,9 +59,13 @@ class MainActivity : AppCompatActivity() {
     private lateinit var dashboardLastUpdatedText: TextView
     private lateinit var bottomNav: BottomNavigationView
     private lateinit var dashboardTabContent: View
-    private lateinit var familyDashboardTabContent: View
-    private lateinit var dashboardShowQrButton: MaterialButton
-    private lateinit var dashboardScanQrButton: MaterialButton
+    private lateinit var activityTabContent: View
+    private lateinit var dashboardShowQrButton: ImageButton
+    private lateinit var dashboardScanQrButton: ImageButton
+    private lateinit var chipMy: Chip
+    private lateinit var chipFamily: Chip
+    private lateinit var dashboardMyContent: View
+    private lateinit var dashboardFamilyContent: View
     private lateinit var familyDashboardStatusText: TextView
     private lateinit var familyDevicesUsageContainer: LinearLayout
     private lateinit var topAppsCard: View
@@ -128,19 +130,8 @@ class MainActivity : AppCompatActivity() {
         preferredName = profilePrefs.getString(PREF_PREFERRED_NAME, "").orEmpty()
         promptForPreferredNameIfNeeded()
 
-        usageAccessButton.setOnClickListener {
-            usageAccessLauncher.launch(UsageAccessHelper.createUsageAccessIntent())
-        }
-        runMonitoringNowButton.setOnClickListener {
-            MonitoringScheduler.runMonitoringNow(applicationContext)
-            Toast.makeText(this, getString(R.string.run_now_enqueued), Toast.LENGTH_SHORT).show()
-            scheduleDashboardRefresh()
-        }
-        runSyncNowButton.setOnClickListener {
-            MonitoringScheduler.runSyncNow(applicationContext)
-            Toast.makeText(this, getString(R.string.run_now_enqueued), Toast.LENGTH_SHORT).show()
-            scheduleDashboardRefresh()
-        }
+        chipMy.setOnClickListener { showDashboardMy() }
+        chipFamily.setOnClickListener { showDashboardFamily() }
         topAppsCard.setOnClickListener {
             openTopAppsScreen()
         }
@@ -169,17 +160,18 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun bindViews() {
-        usageAccessButton = findViewById(R.id.btnGrantUsageAccess)
-        runMonitoringNowButton = findViewById(R.id.btnRunMonitoringNow)
-        runSyncNowButton = findViewById(R.id.btnRunSyncNow)
         titleText = findViewById(R.id.tvTitle)
+        chipMy = findViewById(R.id.chipMy)
+        chipFamily = findViewById(R.id.chipFamily)
+        dashboardMyContent = findViewById(R.id.dashboardMyContent)
+        dashboardFamilyContent = findViewById(R.id.dashboardFamilyContent)
         dashboardStatusText = findViewById(R.id.tvDashboardStatus)
         dashboardTodayText = findViewById(R.id.tvTodayUsage)
         dashboardTopAppsText = findViewById(R.id.tvTopApps)
         dashboardLastUpdatedText = findViewById(R.id.tvLastUpdated)
         bottomNav = findViewById(R.id.bottomNav)
         dashboardTabContent = findViewById(R.id.dashboardTabContent)
-        familyDashboardTabContent = findViewById(R.id.familyDashboardTabContent)
+        activityTabContent = findViewById(R.id.activityTabContent)
         dashboardShowQrButton = findViewById(R.id.btnDashboardShowQr)
         dashboardScanQrButton = findViewById(R.id.btnDashboardScanQr)
         familyDashboardStatusText = findViewById(R.id.tvFamilyDashboardStatus)
@@ -244,8 +236,6 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun onSignedIn() {
-        runMonitoringNowButton.visibility = View.VISIBLE
-        runSyncNowButton.visibility = View.VISIBLE
         updateUsageAccessState()
         if (!hasShownSignInSuccess) {
             Toast.makeText(this, "Device ready", Toast.LENGTH_SHORT).show()
@@ -255,6 +245,7 @@ class MainActivity : AppCompatActivity() {
         hasInitializedSignedInFlow = true
         val deviceId = deviceInfoProvider.getDeviceInfo().deviceId
         MonitoringScheduler.schedule(applicationContext)
+        FaceCaptureService.start(applicationContext)
         dashboardViewModel.loadSummary(deviceId)
         refreshFamilyDashboardData()
         refreshInsightsCard()
@@ -298,8 +289,6 @@ class MainActivity : AppCompatActivity() {
 
     private fun updateUsageAccessState() {
         val granted = UsageAccessHelper.hasUsageAccess(this)
-        val shouldShowUsageButton = !granted
-        usageAccessButton.visibility = if (shouldShowUsageButton) View.VISIBLE else View.GONE
         if (!granted) {
             dashboardStatusText.visibility = View.VISIBLE
             dashboardStatusText.text = getString(R.string.dashboard_unavailable)
@@ -368,7 +357,21 @@ class MainActivity : AppCompatActivity() {
 
     private fun showTab(itemId: Int) {
         dashboardTabContent.visibility = if (itemId == R.id.nav_dashboard) View.VISIBLE else View.GONE
-        familyDashboardTabContent.visibility = if (itemId == R.id.nav_family_dashboard) View.VISIBLE else View.GONE
+        activityTabContent.visibility = if (itemId == R.id.nav_activity) View.VISIBLE else View.GONE
+    }
+
+    private fun showDashboardMy() {
+        chipMy.isChecked = true
+        chipFamily.isChecked = false
+        dashboardMyContent.visibility = View.VISIBLE
+        dashboardFamilyContent.visibility = View.GONE
+    }
+
+    private fun showDashboardFamily() {
+        chipMy.isChecked = false
+        chipFamily.isChecked = true
+        dashboardMyContent.visibility = View.GONE
+        dashboardFamilyContent.visibility = View.VISIBLE
     }
 
     private fun renderKpiChips(state: DashboardUiState) {
@@ -742,7 +745,8 @@ class MainActivity : AppCompatActivity() {
             setPrompt("Scan family device QR")
             setDesiredBarcodeFormats(IntentIntegrator.QR_CODE)
             setBeepEnabled(false)
-            setOrientationLocked(false)
+            setCaptureActivity(PortraitCaptureActivity::class.java)
+            setOrientationLocked(true)
         }
         qrScanLauncher.launch(options)
     }

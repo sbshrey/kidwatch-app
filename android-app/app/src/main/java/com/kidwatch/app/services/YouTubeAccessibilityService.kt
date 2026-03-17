@@ -32,11 +32,13 @@ class YouTubeAccessibilityService : AccessibilityService() {
         lastEventAtMs = now
 
         val repository = LocalMonitoringRepository(applicationContext)
+        val faceDetected = FaceCaptureState.wasFaceSeenRecently()
         serviceScope.launch {
             repository.saveVideoEvent(
                 title = title,
                 channel = channel,
-                timestamp = now
+                timestamp = now,
+                faceDetected = faceDetected
             )
         }
     }
