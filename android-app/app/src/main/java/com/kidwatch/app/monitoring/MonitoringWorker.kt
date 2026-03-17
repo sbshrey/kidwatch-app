@@ -3,7 +3,7 @@ package com.kidwatch.app.monitoring
 import android.content.Context
 import androidx.work.CoroutineWorker
 import androidx.work.WorkerParameters
-import com.kidwatch.app.insights.OpenAiContentAnalyzer
+import com.kidwatch.app.insights.OnDeviceRiskScorer
 import com.kidwatch.app.repository.LocalMonitoringRepository
 import com.kidwatch.app.services.DeviceInfoProvider
 import com.kidwatch.app.services.UsageAccessHelper
@@ -23,6 +23,7 @@ class MonitoringWorker(
         val repository = LocalMonitoringRepository(applicationContext)
         val collector = UsageStatsCollector(applicationContext, repository)
         val deviceInfo = DeviceInfoProvider(applicationContext).getDeviceInfo()
+        repository.pruneOldTelemetry()
 
         collector.collectLastInterval(UsageStatsCollector.DEFAULT_INTERVAL_MS)
 
@@ -36,10 +37,7 @@ class MonitoringWorker(
         val (topChannels, topVideos) = repository.aggregateContentSummary(dayStart, dayEnd)
         repository.enqueueContentSummary(dateKey, deviceInfo.deviceId, topChannels, topVideos)
 
-        val contentAnalyzer = OpenAiContentAnalyzer()
-        val analyses = contentAnalyzer.assessChannelsForYoungKids(
-            channels = topChannels.keys.take(12)
-        )
+        val analyses = OnDeviceRiskScorer.assessChannels(topChannels, maxChannels = 8)
         repository.saveContentAnalysis(dateKey, deviceInfo.deviceId, analyses)
         repository.enqueueContentAnalysis(dateKey, deviceInfo.deviceId, analyses)
 

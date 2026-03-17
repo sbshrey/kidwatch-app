@@ -1,69 +1,11 @@
 rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
-    function isSignedIn() {
-      return request.auth != null;
+    // Open rules for device-id based linking mode.
+    // Any device can read/write all documents without Firebase Auth.
+    match /{document=**} {
+      allow read, write: if true;
     }
 
-    function isFamilyMember(familyId) {
-      return isSignedIn() &&
-        exists(/databases/$(database)/documents/families/$(familyId)/familyMembers/$(request.auth.uid));
-    }
-
-    function hasRole(familyId, allowedRoles) {
-      return isFamilyMember(familyId) &&
-        get(/databases/$(database)/documents/families/$(familyId)/familyMembers/$(request.auth.uid)).data.role in allowedRoles;
-    }
-
-    match /roles/{roleId} {
-      allow read: if isSignedIn();
-      allow write: if false;
-    }
-
-    // Compatibility with existing client writes during migration.
-    match /users/{userId} {
-      allow read, write: if isSignedIn() && request.auth.uid == userId;
-    }
-
-    match /devices/{deviceId} {
-      allow create: if isSignedIn() && request.resource.data.ownerUserId == request.auth.uid;
-      allow read, update, delete: if isSignedIn() && resource.data.ownerUserId == request.auth.uid;
-    }
-
-    match /familyMembers/{userId} {
-      allow read, write: if isSignedIn() && request.auth.uid == userId;
-    }
-
-    match /families/{familyId} {
-      allow read: if isFamilyMember(familyId);
-      allow create: if isSignedIn() && request.auth.uid == familyId;
-      allow update, delete: if hasRole(familyId, ['OWNER', 'PARENT']);
-
-      match /familyMembers/{memberId} {
-        allow read: if isFamilyMember(familyId);
-        allow create, update, delete: if hasRole(familyId, ['OWNER', 'PARENT']);
-      }
-
-      match /devices/{deviceId} {
-        allow read: if isFamilyMember(familyId);
-        allow create, update: if hasRole(familyId, ['OWNER', 'PARENT', 'GUARDIAN']);
-        allow delete: if hasRole(familyId, ['OWNER', 'PARENT']);
-
-        match /dailyUsage/{dateId} {
-          allow read: if isFamilyMember(familyId);
-          allow write: if hasRole(familyId, ['OWNER', 'PARENT', 'GUARDIAN']);
-        }
-
-        match /contentSummary/{dateId} {
-          allow read: if isFamilyMember(familyId);
-          allow write: if hasRole(familyId, ['OWNER', 'PARENT', 'GUARDIAN']);
-        }
-
-        match /contentAnalysis/{dateId} {
-          allow read: if isFamilyMember(familyId);
-          allow write: if hasRole(familyId, ['OWNER', 'PARENT', 'GUARDIAN']);
-        }
-      }
-    }
   }
 }

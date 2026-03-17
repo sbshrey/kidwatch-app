@@ -1,11 +1,12 @@
 package com.kidwatch.app
 
-import android.app.Activity
 import android.content.Intent
+import android.graphics.Bitmap
 import android.os.Bundle
+import android.util.Log
 import android.view.View
+import android.widget.LinearLayout
 import android.widget.ImageView
-import android.widget.ProgressBar
 import android.widget.TextView
 import android.widget.Toast
 import androidx.activity.result.contract.ActivityResultContracts
@@ -14,22 +15,25 @@ import androidx.appcompat.widget.AppCompatButton
 import androidx.lifecycle.lifecycleScope
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
+import com.google.android.material.dialog.MaterialAlertDialogBuilder
 import com.google.android.material.bottomnavigation.BottomNavigationView
+import com.google.android.material.button.MaterialButton
 import com.google.android.material.chip.Chip
-import com.google.firebase.auth.FirebaseAuth
+import com.google.android.material.card.MaterialCardView
+import com.google.android.material.progressindicator.LinearProgressIndicator
+import com.google.android.material.textfield.TextInputEditText
+import com.google.zxing.BarcodeFormat
+import com.google.zxing.integration.android.IntentIntegrator
+import com.google.zxing.MultiFormatWriter
+import com.journeyapps.barcodescanner.ScanContract
+import com.journeyapps.barcodescanner.ScanOptions
 import com.google.firebase.firestore.FirebaseFirestore
-import com.kidwatch.app.auth.AuthUiState
-import com.kidwatch.app.auth.AuthViewModel
-import com.kidwatch.app.auth.GoogleAuthClient
 import com.kidwatch.app.insights.AppCatalogMapper
 import com.kidwatch.app.monitoring.MonitoringScheduler
-import com.kidwatch.app.repository.AuthRepository
 import com.kidwatch.app.repository.DashboardRepository
 import com.kidwatch.app.repository.LocalMonitoringRepository
 import com.kidwatch.app.services.DeviceInfoProvider
-import com.kidwatch.app.services.FirestoreDeviceService
-import com.kidwatch.app.services.FirestoreFamilyService
-import com.kidwatch.app.services.FirestoreUserService
+import com.kidwatch.app.services.DeviceLinkingService
 import com.kidwatch.app.services.UsageAccessHelper
 import com.kidwatch.app.ui.DashboardUiState
 import com.kidwatch.app.ui.DashboardViewModel
@@ -39,31 +43,29 @@ import java.text.SimpleDateFormat
 import java.time.LocalDate
 import java.util.Date
 import java.util.Locale
+import org.json.JSONObject
 
 class MainActivity : AppCompatActivity() {
 
-    private lateinit var authViewModel: AuthViewModel
     private lateinit var dashboardViewModel: DashboardViewModel
-    private lateinit var googleAuthClient: GoogleAuthClient
+    private lateinit var dashboardRepository: DashboardRepository
 
-    private lateinit var signInButton: AppCompatButton
-    private lateinit var signOutButton: AppCompatButton
     private lateinit var usageAccessButton: AppCompatButton
     private lateinit var runMonitoringNowButton: AppCompatButton
     private lateinit var runSyncNowButton: AppCompatButton
     private lateinit var localMonitoringRepository: LocalMonitoringRepository
-    private lateinit var statusText: TextView
-    private lateinit var progressBar: ProgressBar
+    private lateinit var titleText: TextView
     private lateinit var dashboardStatusText: TextView
     private lateinit var dashboardTodayText: TextView
     private lateinit var dashboardTopAppsText: TextView
-    private lateinit var dashboardDeviceUsageText: TextView
     private lateinit var dashboardLastUpdatedText: TextView
     private lateinit var bottomNav: BottomNavigationView
     private lateinit var dashboardTabContent: View
-    private lateinit var alertsTabContent: View
-    private lateinit var rulesTabContent: View
-    private lateinit var settingsTabContent: View
+    private lateinit var familyDashboardTabContent: View
+    private lateinit var dashboardShowQrButton: MaterialButton
+    private lateinit var dashboardScanQrButton: MaterialButton
+    private lateinit var familyDashboardStatusText: TextView
+    private lateinit var familyDevicesUsageContainer: LinearLayout
     private lateinit var topAppsCard: View
     private lateinit var chipScreenTime: Chip
     private lateinit var chipSessions: Chip
@@ -80,10 +82,14 @@ class MainActivity : AppCompatActivity() {
     private val topAppRows = mutableListOf<TopAppRow>()
     private val previousTopAppMinutes = mutableMapOf<String, Int>()
     private val packageByAppLabel = mutableMapOf<String, String>()
+    private lateinit var deviceInfoProvider: DeviceInfoProvider
+    private lateinit var deviceLinkingService: DeviceLinkingService
+    private var preferredName: String = ""
+    private var isNamePromptVisible: Boolean = false
     private var hasInitializedSignedInFlow: Boolean = false
     private var hasShownSignInSuccess: Boolean = false
-    private var skipNextResumeAuthRefresh: Boolean = false
-    private var latestAuthState: AuthUiState = AuthUiState()
+
+    private val profilePrefs by lazy { getSharedPreferences("profile_prefs", MODE_PRIVATE) }
 
     private data class TopAppRow(
         val container: View,
@@ -98,31 +104,16 @@ class MainActivity : AppCompatActivity() {
         val minutes: Int
     )
 
-    private val signInLauncher = registerForActivityResult(
-        ActivityResultContracts.StartActivityForResult()
-    ) { result ->
-        val idTokenResult = googleAuthClient.extractIdToken(result.data)
-        val idToken = idTokenResult.idToken
-
-        if (idToken.isNullOrBlank()) {
-            val fallback = if (result.resultCode == Activity.RESULT_CANCELED) {
-                "Google sign-in was canceled."
-            } else {
-                getString(R.string.auth_google_token_error)
-            }
-            val errorMessage = idTokenResult.errorMessage ?: fallback
-            authViewModel.setAuthError(errorMessage)
-            Toast.makeText(this, errorMessage, Toast.LENGTH_LONG).show()
-            return@registerForActivityResult
-        }
-
-        authViewModel.signInWithGoogle(idToken)
-    }
-
     private val usageAccessLauncher = registerForActivityResult(
         ActivityResultContracts.StartActivityForResult()
     ) {
         updateUsageAccessState()
+    }
+
+    private val qrScanLauncher = registerForActivityResult(ScanContract()) { result ->
+        val raw = result.contents
+        if (raw.isNullOrBlank()) return@registerForActivityResult
+        handleScannedDeviceQr(raw)
     }
 
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -134,33 +125,18 @@ class MainActivity : AppCompatActivity() {
         initViewModels()
         observeState()
         updateUsageAccessState()
+        preferredName = profilePrefs.getString(PREF_PREFERRED_NAME, "").orEmpty()
+        promptForPreferredNameIfNeeded()
 
-        signInButton.setOnClickListener {
-            skipNextResumeAuthRefresh = true
-            signInLauncher.launch(googleAuthClient.signInIntent())
-        }
-        signOutButton.setOnClickListener {
-            authViewModel.signOut()
-        }
         usageAccessButton.setOnClickListener {
             usageAccessLauncher.launch(UsageAccessHelper.createUsageAccessIntent())
         }
         runMonitoringNowButton.setOnClickListener {
-            authViewModel.refreshAuthState()
-            if (!authViewModel.hasActiveSession()) {
-                Toast.makeText(this, getString(R.string.sign_in_required), Toast.LENGTH_SHORT).show()
-                return@setOnClickListener
-            }
             MonitoringScheduler.runMonitoringNow(applicationContext)
             Toast.makeText(this, getString(R.string.run_now_enqueued), Toast.LENGTH_SHORT).show()
             scheduleDashboardRefresh()
         }
         runSyncNowButton.setOnClickListener {
-            authViewModel.refreshAuthState()
-            if (!authViewModel.hasActiveSession()) {
-                Toast.makeText(this, getString(R.string.sign_in_required), Toast.LENGTH_SHORT).show()
-                return@setOnClickListener
-            }
             MonitoringScheduler.runSyncNow(applicationContext)
             Toast.makeText(this, getString(R.string.run_now_enqueued), Toast.LENGTH_SHORT).show()
             scheduleDashboardRefresh()
@@ -183,35 +159,31 @@ class MainActivity : AppCompatActivity() {
         insightRow3.setOnClickListener {
             openTopAppsScreen(packageFilter = "com.google.android.youtube", query = "YouTube")
         }
+        dashboardShowQrButton.setOnClickListener { showMyDeviceQr() }
+        dashboardScanQrButton.setOnClickListener { scanFamilyDeviceQr() }
+        onSignedIn()
     }
 
     override fun onResume() {
         super.onResume()
-        if (skipNextResumeAuthRefresh) {
-            skipNextResumeAuthRefresh = false
-            return
-        }
-        authViewModel.refreshAuthState()
     }
 
     private fun bindViews() {
-        signInButton = findViewById(R.id.btnGoogleSignIn)
-        signOutButton = findViewById(R.id.btnSignOut)
         usageAccessButton = findViewById(R.id.btnGrantUsageAccess)
         runMonitoringNowButton = findViewById(R.id.btnRunMonitoringNow)
         runSyncNowButton = findViewById(R.id.btnRunSyncNow)
-        statusText = findViewById(R.id.tvAuthStatus)
-        progressBar = findViewById(R.id.pbAuth)
+        titleText = findViewById(R.id.tvTitle)
         dashboardStatusText = findViewById(R.id.tvDashboardStatus)
         dashboardTodayText = findViewById(R.id.tvTodayUsage)
         dashboardTopAppsText = findViewById(R.id.tvTopApps)
-        dashboardDeviceUsageText = findViewById(R.id.tvDeviceUsage)
         dashboardLastUpdatedText = findViewById(R.id.tvLastUpdated)
         bottomNav = findViewById(R.id.bottomNav)
         dashboardTabContent = findViewById(R.id.dashboardTabContent)
-        alertsTabContent = findViewById(R.id.alertsTabContent)
-        rulesTabContent = findViewById(R.id.rulesTabContent)
-        settingsTabContent = findViewById(R.id.settingsTabContent)
+        familyDashboardTabContent = findViewById(R.id.familyDashboardTabContent)
+        dashboardShowQrButton = findViewById(R.id.btnDashboardShowQr)
+        dashboardScanQrButton = findViewById(R.id.btnDashboardScanQr)
+        familyDashboardStatusText = findViewById(R.id.tvFamilyDashboardStatus)
+        familyDevicesUsageContainer = findViewById(R.id.familyDevicesUsageContainer)
         topAppsCard = findViewById(R.id.topAppsCard)
         chipScreenTime = findViewById(R.id.chipScreenTime)
         chipSessions = findViewById(R.id.chipSessions)
@@ -251,113 +223,45 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun initViewModels() {
-        googleAuthClient = GoogleAuthClient(this)
-
-        val authRepository = AuthRepository(FirebaseAuth.getInstance())
-        val userService = FirestoreUserService(FirebaseFirestore.getInstance())
-        val familyService = FirestoreFamilyService(FirebaseFirestore.getInstance())
-        val deviceService = FirestoreDeviceService(FirebaseFirestore.getInstance())
-        val deviceInfoProvider = DeviceInfoProvider(this)
+        deviceInfoProvider = DeviceInfoProvider(this)
+        deviceLinkingService = DeviceLinkingService(FirebaseFirestore.getInstance())
+        dashboardRepository = DashboardRepository(FirebaseFirestore.getInstance())
         localMonitoringRepository = LocalMonitoringRepository(applicationContext)
-
-        authViewModel = ViewModelProvider(
-            this,
-            AuthViewModelFactory(
-                authRepository = authRepository,
-                firestoreUserService = userService,
-                firestoreFamilyService = familyService,
-                firestoreDeviceService = deviceService,
-                deviceInfoProvider = deviceInfoProvider,
-                localMonitoringRepository = localMonitoringRepository
-            )
-        )[AuthViewModel::class.java]
 
         dashboardViewModel = ViewModelProvider(
             this,
             DashboardViewModelFactory(
-                dashboardRepository = DashboardRepository(FirebaseFirestore.getInstance()),
+                dashboardRepository = dashboardRepository,
                 localMonitoringRepository = localMonitoringRepository
             )
         )[DashboardViewModel::class.java]
     }
 
     private fun observeState() {
-        authViewModel.uiState.observe(this) { state ->
-            renderState(state)
-        }
         dashboardViewModel.uiState.observe(this) { state ->
             renderDashboard(state)
         }
     }
 
-    private fun renderState(state: AuthUiState) {
-        val signedIn = state.isSignedIn && authViewModel.hasActiveSession() && state.userId.isNotBlank()
-        latestAuthState = state.copy(isSignedIn = signedIn)
-        progressBar.visibility = if (state.isLoading) View.VISIBLE else View.GONE
-        signInButton.isEnabled = !state.isLoading && !signedIn
-        signInButton.visibility = if (signedIn) View.GONE else View.VISIBLE
-        signOutButton.visibility = if (signedIn) View.VISIBLE else View.GONE
-        runMonitoringNowButton.visibility = if (signedIn) View.VISIBLE else View.GONE
-        runSyncNowButton.visibility = if (signedIn) View.VISIBLE else View.GONE
-        if (signedIn) {
-            updateUsageAccessState()
-        } else {
-            usageAccessButton.visibility = View.GONE
-        }
-        runMonitoringNowButton.isEnabled = !state.isLoading
-        runSyncNowButton.isEnabled = !state.isLoading
-
-        if (!signedIn) {
-            hasInitializedSignedInFlow = false
-            hasShownSignInSuccess = false
-            dashboardStatusText.visibility = View.GONE
-            dashboardTodayText.visibility = View.GONE
-            dashboardTopAppsText.visibility = View.GONE
-            dashboardDeviceUsageText.visibility = View.GONE
-            dashboardLastUpdatedText.visibility = View.GONE
-            topAppsSkeleton.visibility = View.GONE
-            topAppsList.visibility = View.GONE
-            topAppsEmptyState.visibility = View.GONE
-            insightsStatusText.visibility = View.GONE
-            insightsList.visibility = View.GONE
-            insightsEmptyState.visibility = View.GONE
-        } else {
-            dashboardTodayText.visibility = View.VISIBLE
-            dashboardTopAppsText.visibility = View.VISIBLE
-            dashboardDeviceUsageText.visibility = View.VISIBLE
-            dashboardLastUpdatedText.visibility = View.VISIBLE
-            insightsStatusText.visibility = View.VISIBLE
-        }
-
-        statusText.text = when {
-            signedIn -> {
-                onSignedIn(state.userId)
-                getString(R.string.auth_signed_in, state.userDisplayName.ifBlank { state.userId })
-            }
-            !state.errorMessage.isNullOrBlank() -> state.errorMessage
-            else -> getString(R.string.auth_signed_out)
-        }
-    }
-
-    private fun onSignedIn(userId: String) {
+    private fun onSignedIn() {
+        runMonitoringNowButton.visibility = View.VISIBLE
+        runSyncNowButton.visibility = View.VISIBLE
+        updateUsageAccessState()
         if (!hasShownSignInSuccess) {
-            Toast.makeText(this, getString(R.string.auth_sign_in_success), Toast.LENGTH_SHORT).show()
+            Toast.makeText(this, "Device ready", Toast.LENGTH_SHORT).show()
             hasShownSignInSuccess = true
         }
         if (hasInitializedSignedInFlow) return
         hasInitializedSignedInFlow = true
-        val deviceId = DeviceInfoProvider(this).getDeviceInfo().deviceId
+        val deviceId = deviceInfoProvider.getDeviceInfo().deviceId
         MonitoringScheduler.schedule(applicationContext)
-        dashboardViewModel.loadSummary(userId, deviceId)
+        dashboardViewModel.loadSummary(deviceId)
+        refreshFamilyDashboardData()
         refreshInsightsCard()
+        updateDashboardGreeting()
     }
 
     private fun renderDashboard(state: DashboardUiState) {
-        if (!latestAuthState.isSignedIn) {
-            dashboardStatusText.visibility = View.GONE
-            return
-        }
-
         if (state.isLoading) {
             dashboardStatusText.visibility = View.VISIBLE
             dashboardStatusText.text = getString(R.string.dashboard_loading)
@@ -380,7 +284,6 @@ class MainActivity : AppCompatActivity() {
 
         dashboardTodayText.text = getString(R.string.dashboard_today_usage, state.totalUsageMinutes)
         dashboardTopAppsText.text = getString(R.string.dashboard_top_apps, state.topAppsText)
-        dashboardDeviceUsageText.text = getString(R.string.dashboard_device_usage, state.deviceUsageText)
         renderKpiChips(state)
         renderTopAppsRows(state.topAppsText)
         refreshInsightsCard()
@@ -395,7 +298,7 @@ class MainActivity : AppCompatActivity() {
 
     private fun updateUsageAccessState() {
         val granted = UsageAccessHelper.hasUsageAccess(this)
-        val shouldShowUsageButton = latestAuthState.isSignedIn && !granted
+        val shouldShowUsageButton = !granted
         usageAccessButton.visibility = if (shouldShowUsageButton) View.VISIBLE else View.GONE
         if (!granted) {
             dashboardStatusText.visibility = View.VISIBLE
@@ -404,13 +307,11 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun scheduleDashboardRefresh() {
-        if (!latestAuthState.isSignedIn) return
-        val userId = latestAuthState.userId
-        if (userId.isBlank()) return
-        val deviceId = DeviceInfoProvider(this).getDeviceInfo().deviceId
+        val deviceId = deviceInfoProvider.getDeviceInfo().deviceId
         lifecycleScope.launch {
             delay(4000L)
-            dashboardViewModel.loadSummary(userId, deviceId)
+            dashboardViewModel.loadSummary(deviceId)
+            refreshFamilyDashboardData()
             refreshInsightsCard()
         }
     }
@@ -467,9 +368,7 @@ class MainActivity : AppCompatActivity() {
 
     private fun showTab(itemId: Int) {
         dashboardTabContent.visibility = if (itemId == R.id.nav_dashboard) View.VISIBLE else View.GONE
-        alertsTabContent.visibility = if (itemId == R.id.nav_alerts) View.VISIBLE else View.GONE
-        rulesTabContent.visibility = if (itemId == R.id.nav_rules) View.VISIBLE else View.GONE
-        settingsTabContent.visibility = if (itemId == R.id.nav_settings) View.VISIBLE else View.GONE
+        familyDashboardTabContent.visibility = if (itemId == R.id.nav_family_dashboard) View.VISIBLE else View.GONE
     }
 
     private fun renderKpiChips(state: DashboardUiState) {
@@ -570,6 +469,382 @@ class MainActivity : AppCompatActivity() {
         packageByAppLabel.putIfAbsent("instagram", "com.instagram.android")
     }
 
+    private fun createInfoRow(text: String): TextView =
+        TextView(this).apply {
+            this.text = text
+            setTextAppearance(com.google.android.material.R.style.TextAppearance_Material3_BodyMedium)
+            setTextColor(currentTextColor)
+        }
+
+    private suspend fun ensureLocalDeviceProfile() {
+        val userId = resolveLocalIdentity()
+        val localDevice = deviceInfoProvider.getDeviceInfo()
+        deviceLinkingService.upsertDeviceProfile(
+            localDevice,
+            userId,
+            preferredName.ifBlank { localDevice.deviceName }
+        )
+    }
+
+    private fun clearFamilyDashboardUi() {
+        familyDashboardStatusText.text = getString(R.string.family_dashboard_empty)
+        familyDevicesUsageContainer.removeAllViews()
+    }
+
+    private fun refreshFamilyDashboardData() {
+        val localDeviceId = deviceInfoProvider.getDeviceInfo().deviceId
+        familyDashboardStatusText.text = getString(R.string.family_dashboard_loading)
+        lifecycleScope.launch {
+            runCatching {
+                ensureLocalDeviceProfile()
+                dashboardRepository.fetchFamilyDevicesSummary(localDeviceId)
+            }.onSuccess { summaries ->
+                familyDevicesUsageContainer.removeAllViews()
+                if (summaries.isEmpty()) {
+                    familyDashboardStatusText.text = getString(R.string.family_dashboard_empty)
+                    return@onSuccess
+                }
+                val activeDevices = summaries.count { it.totalMinutes > 0 }
+                val latestSyncedAt = summaries.mapNotNull { it.lastSyncedAtMillis }.maxOrNull()
+                familyDashboardStatusText.text = if (latestSyncedAt != null) {
+                    getString(
+                        R.string.family_dashboard_synced_count_with_time,
+                        activeDevices,
+                        summaries.size,
+                        formatTimestamp(latestSyncedAt)
+                    )
+                } else {
+                    getString(R.string.family_dashboard_synced_count, activeDevices, summaries.size)
+                }
+                familyDevicesUsageContainer.addView(createFamilyOverviewChartCard(summaries))
+                summaries.forEach { summary ->
+                    familyDevicesUsageContainer.addView(
+                        createFamilyDeviceUsageCard(
+                            summary = summary,
+                            maxFamilyMinutes = summaries.maxOfOrNull { it.totalMinutes } ?: 0
+                        )
+                    )
+                }
+            }.onFailure { throwable ->
+                familyDashboardStatusText.text = throwable.message ?: getString(R.string.dashboard_unavailable)
+            }
+        }
+    }
+
+    private fun createFamilyOverviewChartCard(
+        summaries: List<DashboardRepository.FamilyDeviceUsageSummary>
+    ): MaterialCardView {
+        val maxMinutes = (summaries.maxOfOrNull { it.totalMinutes } ?: 0).coerceAtLeast(1)
+        val card = MaterialCardView(this).apply {
+            radius = 18f
+            cardElevation = 0f
+            strokeWidth = 1
+            setContentPadding(dp(16), dp(16), dp(16), dp(16))
+        }
+        val column = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+        }
+        column.addView(
+            createInfoRow(getString(R.string.family_overview_chart_title)).apply {
+                setTextAppearance(com.google.android.material.R.style.TextAppearance_Material3_TitleMedium)
+            }
+        )
+        column.addView(
+            createInfoRow(getString(R.string.family_overview_chart_subtitle)).apply {
+                setTextAppearance(com.google.android.material.R.style.TextAppearance_Material3_BodySmall)
+            }
+        )
+
+        summaries.forEachIndexed { index, summary ->
+            if (index > 0) {
+                column.addView(View(this).apply {
+                    layoutParams = LinearLayout.LayoutParams(
+                        LinearLayout.LayoutParams.MATCH_PARENT,
+                        dp(8)
+                    )
+                })
+            }
+            column.addView(createFamilyUsageBarRow(summary.displayName, summary.totalMinutes, maxMinutes))
+        }
+        card.addView(column)
+        return card
+    }
+
+    private fun createFamilyUsageBarRow(label: String, minutes: Int, maxMinutes: Int): LinearLayout {
+        val row = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+            layoutParams = LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT,
+                LinearLayout.LayoutParams.WRAP_CONTENT
+            )
+        }
+        val header = LinearLayout(this).apply {
+            orientation = LinearLayout.HORIZONTAL
+            layoutParams = LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT,
+                LinearLayout.LayoutParams.WRAP_CONTENT
+            )
+        }
+        val labelView = createInfoRow(label).apply {
+            layoutParams = LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f)
+            setTextAppearance(com.google.android.material.R.style.TextAppearance_Material3_BodyMedium)
+        }
+        val valueView = createInfoRow(getString(R.string.family_usage_minutes, minutes)).apply {
+            setTextAppearance(com.google.android.material.R.style.TextAppearance_Material3_LabelMedium)
+        }
+        header.addView(labelView)
+        header.addView(valueView)
+
+        val progress = LinearProgressIndicator(this).apply {
+            layoutParams = LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT,
+                LinearLayout.LayoutParams.WRAP_CONTENT
+            ).apply {
+                topMargin = dp(6)
+            }
+            max = 100
+            progress = ((minutes * 100f) / maxMinutes).toInt().coerceIn(0, 100)
+            trackCornerRadius = dp(6)
+        }
+        row.addView(header)
+        row.addView(progress)
+        return row
+    }
+
+    private fun createFamilyDeviceUsageCard(
+        summary: DashboardRepository.FamilyDeviceUsageSummary,
+        maxFamilyMinutes: Int
+    ): MaterialCardView {
+        val card = MaterialCardView(this).apply {
+            radius = 18f
+            cardElevation = 0f
+            setContentPadding(24, 24, 24, 24)
+            strokeWidth = 1
+        }
+        val column = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+        }
+        column.addView(createInfoRow(summary.displayName).apply {
+            setTextAppearance(com.google.android.material.R.style.TextAppearance_Material3_TitleMedium)
+        })
+        column.addView(
+            createInfoRow(
+                summary.lastSyncedAtMillis?.let {
+                    getString(R.string.family_device_last_synced, formatTimestamp(it))
+                } ?: getString(R.string.family_device_not_synced)
+            ).apply {
+                setTextAppearance(com.google.android.material.R.style.TextAppearance_Material3_BodySmall)
+            }
+        )
+        column.addView(
+            createFamilyUsageBarRow(
+                label = getString(R.string.family_today_label),
+                minutes = summary.totalMinutes,
+                maxMinutes = maxFamilyMinutes.coerceAtLeast(1)
+            ).apply {
+                val params = LinearLayout.LayoutParams(
+                    LinearLayout.LayoutParams.MATCH_PARENT,
+                    LinearLayout.LayoutParams.WRAP_CONTENT
+                )
+                params.topMargin = dp(10)
+                layoutParams = params
+            }
+        )
+        column.addView(
+            createInfoRow("Top apps: ${summary.topAppsText}").apply {
+                val params = LinearLayout.LayoutParams(
+                    LinearLayout.LayoutParams.MATCH_PARENT,
+                    LinearLayout.LayoutParams.WRAP_CONTENT
+                )
+                params.topMargin = dp(8)
+                layoutParams = params
+            }
+        )
+        if (!summary.isLocalDevice) {
+            column.addView(
+                MaterialButton(this).apply {
+                    text = getString(R.string.profile_action_unlink)
+                    layoutParams = LinearLayout.LayoutParams(
+                        LinearLayout.LayoutParams.MATCH_PARENT,
+                        LinearLayout.LayoutParams.WRAP_CONTENT
+                    ).apply {
+                        topMargin = dp(12)
+                    }
+                    setOnClickListener { unlinkFamilyDevice(summary.deviceId) }
+                }
+            )
+        }
+        card.addView(column)
+        return card
+    }
+
+    private fun dp(value: Int): Int =
+        (value * resources.displayMetrics.density).toInt()
+
+    private fun unlinkFamilyDevice(remoteDeviceId: String) {
+        val localDeviceId = deviceInfoProvider.getDeviceInfo().deviceId
+        lifecycleScope.launch {
+            runCatching {
+                deviceLinkingService.unlinkDevicesBidirectional(localDeviceId, remoteDeviceId)
+            }.onSuccess {
+                Toast.makeText(this@MainActivity, getString(R.string.profile_status_link_removed), Toast.LENGTH_SHORT).show()
+                refreshFamilyDashboardData()
+            }.onFailure { throwable ->
+                Toast.makeText(this@MainActivity, throwable.message ?: getString(R.string.dashboard_unavailable), Toast.LENGTH_LONG).show()
+            }
+        }
+    }
+
+    private fun showMyDeviceQr() {
+        if (preferredName.isBlank()) {
+            promptForPreferredNameIfNeeded(force = true)
+            return
+        }
+        dashboardStatusText.text = getString(R.string.profile_status_qr_generating)
+        lifecycleScope.launch { ensureLocalDeviceProfile() }
+        val info = deviceInfoProvider.getDeviceInfo()
+        val resolvedIdentity = resolveLocalIdentity()
+        val payload = JSONObject()
+            .put("userId", resolvedIdentity)
+            .put("deviceId", info.deviceId)
+            .put("deviceName", info.deviceName)
+            .put("model", info.model)
+            .put("preferredName", preferredName)
+            .put("isOfflineIdentity", false)
+            .toString()
+
+        val bitmap = runCatching {
+            createQrBitmap(payload, 680)
+        }.getOrElse {
+            Log.e("KidWatchLinking", "showMyDeviceQr failed", it)
+            dashboardStatusText.text = it.message ?: getString(R.string.profile_qr_invalid)
+            Toast.makeText(this, getString(R.string.profile_qr_invalid), Toast.LENGTH_SHORT).show()
+            return
+        }
+        dashboardStatusText.text = getString(R.string.profile_status_qr_ready)
+        showQrDialog(bitmap)
+    }
+
+    private fun showQrDialog(bitmap: Bitmap) {
+        val imageView = ImageView(this).apply {
+            setImageBitmap(bitmap)
+            adjustViewBounds = true
+        }
+        MaterialAlertDialogBuilder(this)
+            .setTitle(getString(R.string.profile_qr_dialog_title))
+            .setView(imageView)
+            .setPositiveButton(android.R.string.ok, null)
+            .show()
+    }
+
+    private fun scanFamilyDeviceQr() {
+        val options = ScanOptions().apply {
+            setPrompt("Scan family device QR")
+            setDesiredBarcodeFormats(IntentIntegrator.QR_CODE)
+            setBeepEnabled(false)
+            setOrientationLocked(false)
+        }
+        qrScanLauncher.launch(options)
+    }
+
+    private fun handleScannedDeviceQr(raw: String) {
+        val parsed = runCatching {
+            val json = JSONObject(raw)
+            QrDevicePayload(
+                userId = json.getString("userId"),
+                deviceId = json.getString("deviceId"),
+                deviceName = json.optString("deviceName", "Family device"),
+                model = json.optString("model", "Unknown"),
+                preferredName = json.optString("preferredName", "")
+            )
+        }.getOrNull()
+
+        if (parsed == null) {
+            Toast.makeText(this, getString(R.string.profile_qr_invalid), Toast.LENGTH_SHORT).show()
+            return
+        }
+        linkScannedDevice(parsed, resolveLocalIdentity())
+    }
+
+    private fun linkScannedDevice(payload: QrDevicePayload, approverId: String) {
+        val localDevice = deviceInfoProvider.getDeviceInfo()
+        lifecycleScope.launch {
+            runCatching {
+                deviceLinkingService.linkDevicesBidirectional(
+                    localDeviceInfo = localDevice,
+                    localAuthUserId = approverId,
+                    localPreferredName = preferredName.ifBlank { localDevice.deviceName },
+                    remoteDeviceId = payload.deviceId,
+                    remoteDeviceName = payload.deviceName,
+                    remotePreferredName = payload.preferredName.ifBlank { payload.deviceName },
+                    remoteModel = payload.model,
+                    customName = payload.preferredName.ifBlank { payload.deviceName }
+                )
+            }.onSuccess {
+                Toast.makeText(this@MainActivity, getString(R.string.profile_qr_link_success), Toast.LENGTH_SHORT).show()
+                dashboardStatusText.text = getString(R.string.profile_qr_link_success)
+                refreshFamilyDashboardData()
+            }.onFailure { throwable ->
+                Toast.makeText(this@MainActivity, throwable.message ?: getString(R.string.profile_qr_link_failed), Toast.LENGTH_LONG).show()
+                dashboardStatusText.text = throwable.message ?: getString(R.string.profile_qr_link_failed)
+            }
+        }
+    }
+
+    private fun resolveLocalIdentity(): String {
+        val deviceId = deviceInfoProvider.getDeviceInfo().deviceId
+        return "local-${deviceId.take(12)}"
+    }
+
+    private fun createQrBitmap(contents: String, size: Int): Bitmap {
+        val bitMatrix = MultiFormatWriter().encode(contents, BarcodeFormat.QR_CODE, size, size)
+        val bitmap = Bitmap.createBitmap(size, size, Bitmap.Config.RGB_565)
+        for (x in 0 until size) {
+            for (y in 0 until size) {
+                bitmap.setPixel(x, y, if (bitMatrix.get(x, y)) android.graphics.Color.BLACK else android.graphics.Color.WHITE)
+            }
+        }
+        return bitmap
+    }
+
+    private fun promptForPreferredNameIfNeeded(force: Boolean = false) {
+        if (isNamePromptVisible) return
+        if (!force && preferredName.isNotBlank()) {
+            updateDashboardGreeting()
+            return
+        }
+        isNamePromptVisible = true
+        val nameInput = TextInputEditText(this).apply {
+            hint = getString(R.string.profile_onboarding_name_hint)
+            setText(preferredName)
+        }
+        MaterialAlertDialogBuilder(this)
+            .setTitle(getString(R.string.profile_onboarding_name_title))
+            .setCancelable(false)
+            .setView(nameInput)
+            .setPositiveButton(android.R.string.ok) { _, _ ->
+                val entered = nameInput.text?.toString().orEmpty().trim()
+                if (entered.isBlank()) {
+                    dashboardStatusText.text = getString(R.string.profile_onboarding_name_required)
+                    isNamePromptVisible = false
+                    promptForPreferredNameIfNeeded(force = true)
+                    return@setPositiveButton
+                }
+                preferredName = entered
+                profilePrefs.edit().putString(PREF_PREFERRED_NAME, preferredName).apply()
+                dashboardStatusText.text = getString(R.string.profile_name_saved, preferredName)
+                updateDashboardGreeting()
+                refreshFamilyDashboardData()
+                isNamePromptVisible = false
+            }
+            .show()
+    }
+
+    private fun updateDashboardGreeting() {
+        val name = preferredName.ifBlank { "there" }
+        titleText.text = getString(R.string.dashboard_greeting_hi, name)
+    }
+
     private fun openTopAppsScreen(packageFilter: String? = null, query: String? = null) {
         val intent = Intent(this, TopAppsActivity::class.java)
         if (!packageFilter.isNullOrBlank()) {
@@ -585,26 +860,17 @@ class MainActivity : AppCompatActivity() {
         val formatter = SimpleDateFormat("hh:mm a", Locale.getDefault())
         return formatter.format(Date(timestampMillis))
     }
-}
 
-private class AuthViewModelFactory(
-    private val authRepository: AuthRepository,
-    private val firestoreUserService: FirestoreUserService,
-    private val firestoreFamilyService: FirestoreFamilyService,
-    private val firestoreDeviceService: FirestoreDeviceService,
-    private val deviceInfoProvider: DeviceInfoProvider,
-    private val localMonitoringRepository: LocalMonitoringRepository
-) : ViewModelProvider.Factory {
-    @Suppress("UNCHECKED_CAST")
-    override fun <T : ViewModel> create(modelClass: Class<T>): T {
-        return AuthViewModel(
-            authRepository = authRepository,
-            firestoreUserService = firestoreUserService,
-            firestoreFamilyService = firestoreFamilyService,
-            firestoreDeviceService = firestoreDeviceService,
-            deviceInfoProvider = deviceInfoProvider,
-            localMonitoringRepository = localMonitoringRepository
-        ) as T
+    private data class QrDevicePayload(
+        val userId: String,
+        val deviceId: String,
+        val deviceName: String,
+        val model: String,
+        val preferredName: String
+    )
+
+    private companion object {
+        private const val PREF_PREFERRED_NAME = "preferred_name"
     }
 }
 

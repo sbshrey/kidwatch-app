@@ -20,7 +20,7 @@ class DashboardViewModel(
     private val _uiState = MutableLiveData(DashboardUiState())
     val uiState: LiveData<DashboardUiState> = _uiState
 
-    fun loadSummary(familyId: String, deviceId: String) {
+    fun loadSummary(deviceId: String) {
         _uiState.value = DashboardUiState(isLoading = true)
         viewModelScope.launch {
             val localSummary = runCatching {
@@ -28,7 +28,7 @@ class DashboardViewModel(
             }.getOrNull()
 
             runCatching {
-                dashboardRepository.fetchTodaySummary(familyId)
+                dashboardRepository.fetchOwnTodaySummary(deviceId)
             }.onSuccess { remoteSummary ->
                 val summary = if (remoteSummary.totalMinutes <= 0 && remoteSummary.topAppsText == "N/A" && localSummary != null) {
                     localSummary

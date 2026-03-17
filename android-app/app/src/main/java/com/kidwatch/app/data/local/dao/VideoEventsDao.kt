@@ -16,4 +16,10 @@ interface VideoEventsDao {
 
     @Query("SELECT * FROM VideoEvents WHERE timestamp >= :startMs AND timestamp < :endMs ORDER BY timestamp DESC")
     suspend fun getInWindow(startMs: Long, endMs: Long): List<VideoEventEntity>
+
+    @Query("SELECT * FROM VideoEvents ORDER BY timestamp DESC LIMIT 1")
+    suspend fun getLatest(): VideoEventEntity?
+
+    @Query("DELETE FROM VideoEvents WHERE timestamp < :cutoffMs")
+    suspend fun deleteOlderThan(cutoffMs: Long): Int
 }

@@ -16,4 +16,13 @@ interface AppUsageDao {
 
     @Query("SELECT * FROM AppUsage WHERE startTime >= :startMs AND startTime < :endMs ORDER BY startTime DESC")
     suspend fun getInWindow(startMs: Long, endMs: Long): List<AppUsageEntity>
+
+    @Query("SELECT * FROM AppUsage WHERE packageName = :packageName ORDER BY endTime DESC LIMIT 1")
+    suspend fun getLatestForPackage(packageName: String): AppUsageEntity?
+
+    @Query("UPDATE AppUsage SET startTime = :startTime, endTime = :endTime, duration = :duration WHERE id = :id")
+    suspend fun updateSession(id: Long, startTime: Long, endTime: Long, duration: Long)
+
+    @Query("DELETE FROM AppUsage WHERE endTime < :cutoffMs")
+    suspend fun deleteOlderThan(cutoffMs: Long): Int
 }

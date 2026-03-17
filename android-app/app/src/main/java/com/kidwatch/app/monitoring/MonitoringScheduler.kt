@@ -8,6 +8,7 @@ import androidx.work.NetworkType
 import androidx.work.OneTimeWorkRequestBuilder
 import androidx.work.PeriodicWorkRequestBuilder
 import androidx.work.WorkManager
+import androidx.work.BackoffPolicy
 import java.util.concurrent.TimeUnit
 
 object MonitoringScheduler {
@@ -24,6 +25,7 @@ object MonitoringScheduler {
             .setConstraints(
                 Constraints.Builder()
                     .setRequiredNetworkType(NetworkType.NOT_REQUIRED)
+                    .setRequiresBatteryNotLow(true)
                     .build()
             )
             .build()
@@ -32,6 +34,7 @@ object MonitoringScheduler {
             .setConstraints(
                 Constraints.Builder()
                     .setRequiredNetworkType(NetworkType.CONNECTED)
+                    .setRequiresBatteryNotLow(true)
                     .build()
             )
             .build()
@@ -53,21 +56,31 @@ object MonitoringScheduler {
         WorkManager.getInstance(context).enqueueUniqueWork(
             MONITORING_NOW_WORK_NAME,
             ExistingWorkPolicy.REPLACE,
-            OneTimeWorkRequestBuilder<MonitoringWorker>().build()
+            OneTimeWorkRequestBuilder<MonitoringWorker>()
+                .setBackoffCriteria(BackoffPolicy.EXPONENTIAL, 10, TimeUnit.SECONDS)
+                .build()
         )
     }
 
     fun runSyncNow(context: Context) {
-        WorkManager.getInstance(context).enqueueUniqueWork(
+        val workManager = WorkManager.getInstance(context)
+        val monitoringNow = OneTimeWorkRequestBuilder<MonitoringWorker>()
+            .setBackoffCriteria(BackoffPolicy.EXPONENTIAL, 10, TimeUnit.SECONDS)
+            .build()
+        val syncNow = OneTimeWorkRequestBuilder<SyncWorker>()
+            .setConstraints(
+                Constraints.Builder()
+                    .setRequiredNetworkType(NetworkType.CONNECTED)
+                    .setRequiresBatteryNotLow(true)
+                    .build()
+            )
+            .setBackoffCriteria(BackoffPolicy.EXPONENTIAL, 15, TimeUnit.SECONDS)
+            .build()
+
+        workManager.beginUniqueWork(
             SYNC_NOW_WORK_NAME,
             ExistingWorkPolicy.REPLACE,
-            OneTimeWorkRequestBuilder<SyncWorker>()
-                .setConstraints(
-                    Constraints.Builder()
-                        .setRequiredNetworkType(NetworkType.CONNECTED)
-                        .build()
-                )
-                .build()
-        )
+            monitoringNow
+        ).then(syncNow).enqueue()
     }
 }

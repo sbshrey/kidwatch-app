@@ -1,5 +1,6 @@
 package com.kidwatch.app.services
 
+import com.google.firebase.firestore.FieldValue
 import com.google.firebase.firestore.FirebaseFirestore
 import com.google.firebase.firestore.SetOptions
 import kotlinx.coroutines.tasks.await
@@ -10,21 +11,19 @@ class FirestoreSyncService(
 ) {
 
     suspend fun uploadDailyUsage(
-        familyId: String,
         deviceId: String,
         dateKey: String,
         appMinutes: Map<String, Long>
     ) {
-        val doc = firestore.collection("families")
-            .document(familyId)
-            .collection("devices")
+        val doc = firestore.collection("deviceProfiles")
             .document(deviceId)
             .collection("dailyUsage")
             .document(dateKey)
 
         val payload = mutableMapOf<String, Any>(
             "date" to dateKey,
-            "deviceId" to deviceId
+            "deviceId" to deviceId,
+            "syncedAt" to FieldValue.serverTimestamp()
         )
         appMinutes.forEach { (pkg, mins) ->
             val key = sanitizeKey(pkg)
@@ -34,15 +33,12 @@ class FirestoreSyncService(
     }
 
     suspend fun uploadContentSummary(
-        familyId: String,
         deviceId: String,
         dateKey: String,
         topChannels: Map<String, Int>,
         topVideos: Map<String, Int>
     ) {
-        val doc = firestore.collection("families")
-            .document(familyId)
-            .collection("devices")
+        val doc = firestore.collection("deviceProfiles")
             .document(deviceId)
             .collection("contentSummary")
             .document(dateKey)
@@ -57,14 +53,11 @@ class FirestoreSyncService(
     }
 
     suspend fun uploadContentAnalysis(
-        familyId: String,
         deviceId: String,
         dateKey: String,
         assessments: List<ContentAssessment>
     ) {
-        val doc = firestore.collection("families")
-            .document(familyId)
-            .collection("devices")
+        val doc = firestore.collection("deviceProfiles")
             .document(deviceId)
             .collection("contentAnalysis")
             .document(dateKey)

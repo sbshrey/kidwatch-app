@@ -6,7 +6,6 @@ import com.kidwatch.app.data.local.entity.AppUsageEntity
 import com.kidwatch.app.data.local.entity.ContentAnalysisEntity
 import com.kidwatch.app.data.local.entity.SyncQueueEntity
 import com.kidwatch.app.data.local.entity.VideoEventEntity
-import com.kidwatch.app.insights.OpenAiContentAnalyzer
 import org.json.JSONArray
 import org.json.JSONObject
 
@@ -32,6 +31,18 @@ class LocalMonitoringRepository(
 
     suspend fun saveAppUsage(appPackage: String, startTime: Long, endTime: Long, duration: Long) {
         if (duration <= 0L) return
+        val latest = database.appUsageDao().getLatestForPackage(appPackage)
+        if (latest != null && startTime <= latest.endTime + SESSION_MERGE_WINDOW_MS) {
+            val mergedStart = minOf(latest.startTime, startTime)
+            val mergedEnd = maxOf(latest.endTime, endTime)
+            database.appUsageDao().updateSession(
+                id = latest.id,
+                startTime = mergedStart,
+                endTime = mergedEnd,
+                duration = mergedEnd - mergedStart
+            )
+            return
+        }
         database.appUsageDao().insert(
             AppUsageEntity(
                 packageName = appPackage,
@@ -44,6 +55,15 @@ class LocalMonitoringRepository(
 
     suspend fun saveVideoEvent(title: String, channel: String, timestamp: Long) {
         if (title.isBlank() && channel.isBlank()) return
+        val latest = database.videoEventsDao().getLatest()
+        if (
+            latest != null &&
+            latest.title.equals(title, ignoreCase = true) &&
+            latest.channel.equals(channel, ignoreCase = true) &&
+            timestamp - latest.timestamp < VIDEO_EVENT_MIN_INTERVAL_MS
+        ) {
+            return
+        }
         database.videoEventsDao().insert(
             VideoEventEntity(
                 title = title.ifBlank { "Unknown" },
@@ -85,7 +105,7 @@ class LocalMonitoringRepository(
         enqueueSummary("content_summary", payload)
     }
 
-    suspend fun saveContentAnalysis(dateKey: String, deviceId: String, analyses: List<OpenAiContentAnalyzer.AnalysisResult>) {
+    suspend fun saveContentAnalysis(dateKey: String, deviceId: String, analyses: List<ChannelAssessment>) {
         if (analyses.isEmpty()) return
         val createdAt = System.currentTimeMillis()
         database.contentAnalysisDao().insertAll(
@@ -96,7 +116,7 @@ class LocalMonitoringRepository(
                     channel = it.channel,
                     label = it.label,
                     reason = it.reason,
-                    model = "gpt-4o-mini",
+                    model = "on-device-heuristic-v1",
                     createdAt = createdAt
                 )
             }
@@ -106,7 +126,7 @@ class LocalMonitoringRepository(
     suspend fun enqueueContentAnalysis(
         dateKey: String,
         deviceId: String,
-        analyses: List<OpenAiContentAnalyzer.AnalysisResult>
+        analyses: List<ChannelAssessment>
     ) {
         if (analyses.isEmpty()) return
         val assessments = JSONArray()
@@ -136,5 +156,23 @@ class LocalMonitoringRepository(
 
     suspend fun markSyncDone(id: Long) {
         database.syncQueueDao().markSynced(id)
+    }
+
+    suspend fun pruneOldTelemetry(nowMillis: Long = System.currentTimeMillis()) {
+        val cutoff = nowMillis - TELEMETRY_RETENTION_MS
+        database.appUsageDao().deleteOlderThan(cutoff)
+        database.videoEventsDao().deleteOlderThan(cutoff)
+    }
+
+    data class ChannelAssessment(
+        val channel: String,
+        val label: String,
+        val reason: String
+    )
+
+    private companion object {
+        private const val SESSION_MERGE_WINDOW_MS = 2 * 60 * 1000L
+        private const val VIDEO_EVENT_MIN_INTERVAL_MS = 20_000L
+        private const val TELEMETRY_RETENTION_MS = 7L * 24L * 60L * 60L * 1000L
     }
 }
