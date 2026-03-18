@@ -153,6 +153,12 @@ class LocalMonitoringRepository(
         return database.contentAnalysisDao().getForDate(dateKey)
     }
 
+    suspend fun getRecentVideoEvents(limit: Int = 20): List<VideoEventEntity> {
+        val end = System.currentTimeMillis()
+        val start = end - 24 * 60 * 60 * 1000L
+        return database.videoEventsDao().getInWindow(start, end).take(limit)
+    }
+
     suspend fun getPendingSync() = database.syncQueueDao().getPending()
 
     suspend fun markSyncDone(id: Long) {

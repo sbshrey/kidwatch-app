@@ -1,6 +1,9 @@
 package com.kidwatch.app
 
+import android.Manifest
 import android.content.Intent
+import android.provider.Settings
+import android.content.pm.PackageManager
 import android.graphics.Bitmap
 import android.os.Bundle
 import android.util.Log
@@ -35,6 +38,7 @@ import com.kidwatch.app.repository.LocalMonitoringRepository
 import com.kidwatch.app.services.DeviceInfoProvider
 import com.kidwatch.app.services.DeviceLinkingService
 import com.kidwatch.app.services.FaceCaptureService
+import com.kidwatch.app.services.FaceCaptureState
 import com.kidwatch.app.services.UsageAccessHelper
 import com.kidwatch.app.ui.DashboardUiState
 import com.kidwatch.app.ui.DashboardViewModel
@@ -81,6 +85,10 @@ class MainActivity : AppCompatActivity() {
     private lateinit var insightRow1: TextView
     private lateinit var insightRow2: TextView
     private lateinit var insightRow3: TextView
+    private lateinit var faceDetectionStatusText: TextView
+    private lateinit var btnFaceDetectionPermissions: MaterialButton
+    private lateinit var videosWatchedText: TextView
+    private lateinit var btnOpenAccessibilitySettings: MaterialButton
     private val topAppRows = mutableListOf<TopAppRow>()
     private val previousTopAppMinutes = mutableMapOf<String, Int>()
     private val packageByAppLabel = mutableMapOf<String, String>()
@@ -110,6 +118,15 @@ class MainActivity : AppCompatActivity() {
         ActivityResultContracts.StartActivityForResult()
     ) {
         updateUsageAccessState()
+        if (hasFaceCapturePermissions()) FaceCaptureService.start(applicationContext)
+        refreshFaceCaptureStatus()
+    }
+
+    private val cameraPermissionLauncher = registerForActivityResult(
+        ActivityResultContracts.RequestPermission()
+    ) { granted ->
+        if (granted) FaceCaptureService.start(applicationContext)
+        refreshFaceCaptureStatus()
     }
 
     private val qrScanLauncher = registerForActivityResult(ScanContract()) { result ->
@@ -152,11 +169,17 @@ class MainActivity : AppCompatActivity() {
         }
         dashboardShowQrButton.setOnClickListener { showMyDeviceQr() }
         dashboardScanQrButton.setOnClickListener { scanFamilyDeviceQr() }
+        btnFaceDetectionPermissions.setOnClickListener { requestFaceCapturePermissions() }
+        btnOpenAccessibilitySettings.setOnClickListener {
+            startActivity(Intent(Settings.ACTION_ACCESSIBILITY_SETTINGS))
+        }
         onSignedIn()
     }
 
     override fun onResume() {
         super.onResume()
+        refreshFaceCaptureStatus()
+        refreshVideosWatchedCard()
     }
 
     private fun bindViews() {
@@ -189,6 +212,10 @@ class MainActivity : AppCompatActivity() {
         insightRow1 = findViewById(R.id.tvInsightRow1)
         insightRow2 = findViewById(R.id.tvInsightRow2)
         insightRow3 = findViewById(R.id.tvInsightRow3)
+        faceDetectionStatusText = findViewById(R.id.tvFaceDetectionStatus)
+        btnFaceDetectionPermissions = findViewById(R.id.btnFaceDetectionPermissions)
+        videosWatchedText = findViewById(R.id.tvVideosWatched)
+        btnOpenAccessibilitySettings = findViewById(R.id.btnOpenAccessibilitySettings)
         topAppRows.clear()
         topAppRows += TopAppRow(
             container = findViewById(R.id.topAppRow1),
@@ -245,7 +272,9 @@ class MainActivity : AppCompatActivity() {
         hasInitializedSignedInFlow = true
         val deviceId = deviceInfoProvider.getDeviceInfo().deviceId
         MonitoringScheduler.schedule(applicationContext)
-        FaceCaptureService.start(applicationContext)
+        if (hasFaceCapturePermissions()) {
+            FaceCaptureService.start(applicationContext)
+        }
         dashboardViewModel.loadSummary(deviceId)
         refreshFamilyDashboardData()
         refreshInsightsCard()
@@ -285,6 +314,76 @@ class MainActivity : AppCompatActivity() {
         } else {
             dashboardLastUpdatedText.visibility = View.GONE
         }
+    }
+
+    private fun hasFaceCapturePermissions(): Boolean {
+        val hasCamera = if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.M) {
+            checkSelfPermission(Manifest.permission.CAMERA) == PackageManager.PERMISSION_GRANTED
+        } else true
+        return hasCamera && UsageAccessHelper.hasUsageAccess(this)
+    }
+
+    private fun hasCameraPermission(): Boolean {
+        return if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.M) {
+            checkSelfPermission(Manifest.permission.CAMERA) == PackageManager.PERMISSION_GRANTED
+        } else true
+    }
+
+    private fun refreshVideosWatchedCard() {
+        if (!::videosWatchedText.isInitialized) return
+        lifecycleScope.launch {
+            val events = runCatching {
+                localMonitoringRepository.getRecentVideoEvents(15)
+            }.getOrElse { emptyList() }
+            videosWatchedText.text = if (events.isEmpty()) {
+                getString(R.string.videos_watched_empty)
+            } else {
+                events.joinToString("\n") { e ->
+                    getString(R.string.videos_watched_item, e.title, e.channel)
+                }
+            }
+        }
+    }
+
+    private fun refreshFaceCaptureStatus() {
+        if (!::faceDetectionStatusText.isInitialized) return
+        val missing = mutableListOf<String>()
+        if (!hasCameraPermission()) missing.add(getString(R.string.face_detection_camera_needed))
+        if (!UsageAccessHelper.hasUsageAccess(this)) missing.add(getString(R.string.face_detection_usage_needed))
+        if (missing.isNotEmpty()) {
+            faceDetectionStatusText.text = getString(R.string.face_detection_status_permissions_hint)
+            btnFaceDetectionPermissions.visibility = View.VISIBLE
+            return
+        }
+        btnFaceDetectionPermissions.visibility = View.GONE
+        val lastAt = FaceCaptureState.lastFaceDetectedAt
+        if (lastAt == 0L) {
+            faceDetectionStatusText.text = getString(R.string.face_detection_status_no_viewer)
+            return
+        }
+        val ago = formatTimeAgo(System.currentTimeMillis() - lastAt)
+        faceDetectionStatusText.text = getString(R.string.face_detection_status_viewer_seen, ago)
+    }
+
+    private fun formatTimeAgo(ms: Long): String {
+        val sec = ms / 1000
+        return when {
+            sec < 60 -> getString(R.string.time_ago_seconds, sec)
+            else -> getString(R.string.time_ago_minutes, sec / 60)
+        }
+    }
+
+    private fun requestFaceCapturePermissions() {
+        if (!hasCameraPermission()) {
+            cameraPermissionLauncher.launch(Manifest.permission.CAMERA)
+            return
+        }
+        if (!UsageAccessHelper.hasUsageAccess(this)) {
+            usageAccessLauncher.launch(UsageAccessHelper.createUsageAccessIntent())
+            return
+        }
+        FaceCaptureService.start(applicationContext)
+        refreshFaceCaptureStatus()
     }
 
     private fun updateUsageAccessState() {
@@ -358,6 +457,10 @@ class MainActivity : AppCompatActivity() {
     private fun showTab(itemId: Int) {
         dashboardTabContent.visibility = if (itemId == R.id.nav_dashboard) View.VISIBLE else View.GONE
         activityTabContent.visibility = if (itemId == R.id.nav_activity) View.VISIBLE else View.GONE
+        if (itemId == R.id.nav_activity) {
+            refreshFaceCaptureStatus()
+            refreshVideosWatchedCard()
+        }
     }
 
     private fun showDashboardMy() {

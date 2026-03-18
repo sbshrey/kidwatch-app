@@ -123,4 +123,18 @@
     <string name="face_capture_channel_desc">Detects viewer when watching content</string>
     <string name="face_capture_notification_title">KidWatch</string>
     <string name="face_capture_notification_text">Viewing detection active</string>
+    <string name="face_detection_status_title">Viewer detection</string>
+    <string name="face_detection_status_viewer_seen">Viewer detected %1$s ago</string>
+    <string name="face_detection_status_no_viewer">No viewer detected. Open YouTube while facing the camera.</string>
+    <string name="face_detection_status_permissions_needed">Camera and usage access required</string>
+    <string name="face_detection_status_permissions_hint">Grant permissions to detect who is watching content.</string>
+    <string name="face_detection_grant_permissions">Grant permissions</string>
+    <string name="face_detection_camera_needed">Camera access needed</string>
+    <string name="face_detection_usage_needed">Usage access needed</string>
+    <string name="time_ago_seconds">%1$ds</string>
+    <string name="time_ago_minutes">%1$dm</string>
+    <string name="section_videos_watched">Videos watched</string>
+    <string name="videos_watched_empty">No videos captured yet. Enable KidWatch in Accessibility, then open YouTube.</string>
+    <string name="open_accessibility_settings">Open Accessibility settings</string>
+    <string name="videos_watched_item">%1$s — %2$s</string>
 </resources>
