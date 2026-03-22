@@ -1,16 +1,20 @@
 package com.kidwatch.app
 
-import android.graphics.Typeface
 import android.os.Bundle
 import android.text.Editable
+import android.text.TextUtils
 import android.text.TextWatcher
+import android.view.Gravity
 import android.view.View
+import android.widget.FrameLayout
+import android.widget.ImageButton
 import android.widget.ImageView
 import android.widget.LinearLayout
 import android.widget.TextView
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.content.ContextCompat
 import androidx.lifecycle.lifecycleScope
+import com.google.android.material.card.MaterialCardView
 import com.google.android.material.chip.Chip
 import com.kidwatch.app.repository.LocalMonitoringRepository
 import kotlinx.coroutines.launch
@@ -19,13 +23,16 @@ import java.time.ZoneId
 
 class TopAppsActivity : AppCompatActivity() {
 
+    private lateinit var btnBack: ImageButton
     private lateinit var topAppsContainer: LinearLayout
     private lateinit var topAppsEmpty: TextView
+    private lateinit var topAppsMeta: TextView
     private lateinit var searchInput: com.google.android.material.textfield.TextInputEditText
     private lateinit var chipSortTime: Chip
     private lateinit var chipSortName: Chip
     private lateinit var repository: LocalMonitoringRepository
     private var allApps: List<AppUsageItem> = emptyList()
+    private var totalTrackedAppsCount: Int = 0
     private var sortByTime: Boolean = true
     private var packageFilter: String? = null
 
@@ -43,15 +50,18 @@ class TopAppsActivity : AppCompatActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_top_apps)
-        supportActionBar?.setDisplayHomeAsUpEnabled(true)
 
+        btnBack = findViewById(R.id.btnTopAppsBack)
         topAppsContainer = findViewById(R.id.topAppsContainer)
         topAppsEmpty = findViewById(R.id.tvTopAppsEmpty)
+        topAppsMeta = findViewById(R.id.tvTopAppsMeta)
         searchInput = findViewById(R.id.etSearchApps)
         chipSortTime = findViewById(R.id.chipSortTime)
         chipSortName = findViewById(R.id.chipSortName)
         repository = LocalMonitoringRepository(applicationContext)
         packageFilter = intent.getStringExtra(EXTRA_PACKAGE_FILTER)?.takeIf { it.isNotBlank() }
+
+        btnBack.setOnClickListener { finish() }
 
         searchInput.setText(intent.getStringExtra(EXTRA_QUERY).orEmpty())
         searchInput.addTextChangedListener(object : TextWatcher {
@@ -78,11 +88,6 @@ class TopAppsActivity : AppCompatActivity() {
         loadTopApps()
     }
 
-    override fun onSupportNavigateUp(): Boolean {
-        finish()
-        return true
-    }
-
     private fun loadTopApps() {
         lifecycleScope.launch {
             val now = System.currentTimeMillis()
@@ -102,6 +107,7 @@ class TopAppsActivity : AppCompatActivity() {
                         minutes = minutes.toInt()
                     )
                 }
+            totalTrackedAppsCount = allApps.size
 
             if (packageFilter != null) {
                 allApps = allApps.filter { it.packageName == packageFilter }
@@ -122,6 +128,12 @@ class TopAppsActivity : AppCompatActivity() {
                 else items.sortedBy { it.appName.lowercase() }
             }
 
+        topAppsMeta.text = if (query.isBlank() && packageFilter.isNullOrBlank()) {
+            getString(R.string.top_apps_meta, totalTrackedAppsCount)
+        } else {
+            getString(R.string.top_apps_meta_filtered, filtered.size, totalTrackedAppsCount)
+        }
+
         topAppsContainer.removeAllViews()
         if (filtered.isEmpty()) {
             topAppsEmpty.visibility = View.VISIBLE
@@ -135,36 +147,76 @@ class TopAppsActivity : AppCompatActivity() {
     }
 
     private fun createAppRow(item: AppUsageItem): View {
+        val card = MaterialCardView(this).apply {
+            layoutParams = LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT,
+                LinearLayout.LayoutParams.WRAP_CONTENT
+            ).apply {
+                topMargin = dp(10)
+            }
+            radius = dp(22).toFloat()
+            cardElevation = 0f
+            strokeWidth = dp(1)
+            strokeColor = ContextCompat.getColor(this@TopAppsActivity, R.color.kw_outline_variant)
+            setCardBackgroundColor(ContextCompat.getColor(this@TopAppsActivity, R.color.kw_card_surface))
+        }
+
         val row = LinearLayout(this).apply {
             orientation = LinearLayout.HORIZONTAL
-            setPadding(0, dp(10), 0, dp(10))
-            gravity = android.view.Gravity.CENTER_VERTICAL
+            gravity = Gravity.CENTER_VERTICAL
+            setPadding(dp(14), dp(14), dp(14), dp(14))
+        }
+
+        val iconShell = FrameLayout(this).apply {
+            layoutParams = LinearLayout.LayoutParams(dp(44), dp(44))
+            background = ContextCompat.getDrawable(this@TopAppsActivity, R.drawable.bg_pill_soft)
         }
 
         val iconView = ImageView(this).apply {
-            layoutParams = LinearLayout.LayoutParams(dp(26), dp(26))
+            layoutParams = FrameLayout.LayoutParams(dp(22), dp(22), Gravity.CENTER)
             runCatching { setImageDrawable(packageManager.getApplicationIcon(item.packageName)) }
-                .onFailure { setImageResource(android.R.drawable.sym_def_app_icon) }
+                .onFailure { setImageResource(R.drawable.ic_placeholder_apps) }
+        }
+        iconShell.addView(iconView)
+
+        val textColumn = LinearLayout(this).apply {
+            layoutParams = LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f).also {
+                it.marginStart = dp(12)
+                it.marginEnd = dp(10)
+            }
+            orientation = LinearLayout.VERTICAL
         }
 
         val title = TextView(this).apply {
-            layoutParams = LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f).also {
-                it.marginStart = dp(10)
-            }
             text = item.appName
             textSize = 16f
-            setTypeface(typeface, Typeface.NORMAL)
+            setTextColor(ContextCompat.getColor(this@TopAppsActivity, R.color.kw_on_surface))
+            typeface = android.graphics.Typeface.DEFAULT_BOLD
         }
 
         val subtitle = TextView(this).apply {
-            text = getString(R.string.top_apps_item_minutes, item.minutes)
-            setTextColor(ContextCompat.getColor(this@TopAppsActivity, android.R.color.darker_gray))
+            text = item.packageName
+            textSize = 13f
+            maxLines = 1
+            ellipsize = TextUtils.TruncateAt.END
+            setTextColor(ContextCompat.getColor(this@TopAppsActivity, R.color.kw_on_surface_variant))
         }
 
-        row.addView(iconView)
-        row.addView(title)
-        row.addView(subtitle)
-        return row
+        val badge = TextView(this).apply {
+            text = getString(R.string.top_apps_minutes_badge, item.minutes)
+            textSize = 11f
+            setTextColor(ContextCompat.getColor(this@TopAppsActivity, R.color.kw_on_primary_container))
+            background = ContextCompat.getDrawable(this@TopAppsActivity, R.drawable.bg_pill_soft)
+            setPadding(dp(10), dp(7), dp(10), dp(7))
+        }
+
+        textColumn.addView(title)
+        textColumn.addView(subtitle)
+        row.addView(iconShell)
+        row.addView(textColumn)
+        row.addView(badge)
+        card.addView(row)
+        return card
     }
 
     private fun resolveAppName(packageName: String): String {

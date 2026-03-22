@@ -1,0 +1,24 @@
+package com.kidwatch.app
+
+object ProfilePreferences {
+    const val PREFS_NAME = "profile_prefs"
+    const val PREF_PREFERRED_NAME = "preferred_name"
+    const val PREF_TESTER_NAME = "tester_name"
+    const val PREF_TESTER_KEY = "tester_key"
+    const val PREF_TESTER_PHONE_LAST4 = "tester_phone_last4"
+    const val PREF_INSTALL_INSTANCE_ID = "install_instance_id"
+    const val PREF_FIRST_OPENED_AT = "first_opened_at"
+    const val PREF_LAST_APP_OPEN_AT = "last_app_open_at"
+    const val PREF_TEST_COHORT = "test_cohort"
+    const val PREF_TESTER_PROFILE_REGISTERED_AT = "tester_profile_registered_at"
+    const val PREF_ONBOARDING_COMPLETED_AT = "onboarding_completed_at"
+    const val PREF_USAGE_ACCESS_GRANTED_AT = "usage_access_granted_at"
+    const val PREF_ACCESSIBILITY_ENABLED_AT = "accessibility_enabled_at"
+    const val PREF_CAMERA_GRANTED_AT = "camera_granted_at"
+    const val PREF_AUTOMATIC_EVIDENCE_ENABLED_AT = "automatic_evidence_enabled_at"
+    const val PREF_FIRST_SESSION_RECORDED_AT = "first_session_recorded_at"
+    const val PREF_FIRST_SCREENSHOT_RECORDED_AT = "first_screenshot_recorded_at"
+    const val PREF_FIRST_FACE_RECORDED_AT = "first_face_recorded_at"
+    const val PREF_FIRST_CONTENT_EVENT_RECORDED_AT = "first_content_event_recorded_at"
+    const val PREF_LAST_APP_OPEN_EVENT_AT = "last_app_open_event_at"
+}

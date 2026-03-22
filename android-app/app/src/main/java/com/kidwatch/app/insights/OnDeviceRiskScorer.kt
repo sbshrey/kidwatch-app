@@ -4,6 +4,8 @@ import com.kidwatch.app.repository.LocalMonitoringRepository
 
 object OnDeviceRiskScorer {
 
+    const val MODEL_NAME = "on-device-heuristic-v1"
+
     fun assessChannels(
         channelCounts: Map<String, Int>,
         maxChannels: Int = 10
@@ -30,17 +32,20 @@ object OnDeviceRiskScorer {
                     score >= 3 -> LocalMonitoringRepository.ChannelAssessment(
                         channel = channel,
                         label = "high",
-                        reason = "High-repeat or risky content keywords detected."
+                        reason = "High-repeat or risky content keywords detected.",
+                        model = MODEL_NAME
                     )
                     score == 2 -> LocalMonitoringRepository.ChannelAssessment(
                         channel = channel,
                         label = "moderate",
-                        reason = "Moderate exposure pattern detected."
+                        reason = "Moderate exposure pattern detected.",
+                        model = MODEL_NAME
                     )
                     else -> LocalMonitoringRepository.ChannelAssessment(
                         channel = channel,
                         label = "safe",
-                        reason = "No strong risk indicators in current viewing pattern."
+                        reason = "No strong risk indicators in current viewing pattern.",
+                        model = MODEL_NAME
                     )
                 }
             }

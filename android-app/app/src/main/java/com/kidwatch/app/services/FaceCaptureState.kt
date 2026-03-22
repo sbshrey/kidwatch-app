@@ -2,7 +2,7 @@ package com.kidwatch.app.services
 
 /**
  * Shared state for face detection.
- * FaceCaptureService updates lastFaceDetectedAt when a face is seen.
+ * EvidenceCaptureService updates lastFaceDetectedAt when a face is seen.
  * Video event capture (AccessibilityService path) reads this to enrich events.
  */
 object FaceCaptureState {

@@ -12,18 +12,24 @@ object AppCatalogMapper {
     // Curated app catalog for common social, streaming, gaming, and utility apps.
     private val knownAppsByPackage: Map<String, KnownApp> = mapOf(
         "com.google.android.youtube" to KnownApp("YouTube", "youtube"),
+        "com.google.android.apps.youtube.kids" to KnownApp("YouTube Kids", "youtube"),
         "com.instagram.android" to KnownApp("Instagram", "instagram"),
         "com.whatsapp" to KnownApp("WhatsApp", "whatsapp"),
         "com.snapchat.android" to KnownApp("Snapchat", "snapchat"),
         "com.zhiliaoapp.musically" to KnownApp("TikTok", "tiktok"),
         "com.facebook.katana" to KnownApp("Facebook", "facebook"),
         "com.facebook.orca" to KnownApp("Messenger", "messenger"),
+        "com.instagram.barcelona" to KnownApp("Threads", "instagram"),
+        "org.telegram.messenger" to KnownApp("Telegram", "messages"),
         "com.twitter.android" to KnownApp("X", "x"),
         "com.reddit.frontpage" to KnownApp("Reddit", "reddit"),
         "com.discord" to KnownApp("Discord", "discord"),
         "com.spotify.music" to KnownApp("Spotify", "spotify"),
         "com.netflix.mediaclient" to KnownApp("Netflix", "netflix"),
         "com.amazon.avod.thirdpartyclient" to KnownApp("Prime Video", "prime_video"),
+        "in.startv.hotstar" to KnownApp("Disney+ Hotstar", "prime_video"),
+        "com.jio.media.ondemand" to KnownApp("JioCinema", "prime_video"),
+        "com.mxtech.videoplayer.ad" to KnownApp("MX Player", "youtube"),
         "com.google.android.apps.youtube.music" to KnownApp("YouTube Music", "youtube_music"),
         "com.google.android.apps.messaging" to KnownApp("Messages", "messages"),
         "com.google.android.gm" to KnownApp("Gmail", "gmail"),
@@ -51,10 +57,17 @@ object AppCatalogMapper {
         "whatsapp messenger" to "com.whatsapp",
         "instagram" to "com.instagram.android",
         "insta" to "com.instagram.android",
+        "threads" to "com.instagram.barcelona",
+        "telegram" to "org.telegram.messenger",
         "facebook" to "com.facebook.katana",
         "messenger" to "com.facebook.orca",
+        "snapchat" to "com.snapchat.android",
         "x" to "com.twitter.android",
-        "twitter" to "com.twitter.android"
+        "twitter" to "com.twitter.android",
+        "netflix" to "com.netflix.mediaclient",
+        "prime video" to "com.amazon.avod.thirdpartyclient",
+        "hotstar" to "in.startv.hotstar",
+        "jiocinema" to "com.jio.media.ondemand"
     )
 
     fun toDisplaySummary(appMinutesRaw: Map<String, Long>, topLimit: Int = 3): String {

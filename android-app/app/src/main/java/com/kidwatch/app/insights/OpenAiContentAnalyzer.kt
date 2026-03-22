@@ -53,13 +53,56 @@ class OpenAiContentAnalyzer {
         }
 
         val prompt = buildPrompt(channels)
+        val schema = JSONObject()
+            .put("type", "object")
+            .put(
+                "properties",
+                JSONObject().put(
+                    "assessments",
+                    JSONObject()
+                        .put("type", "array")
+                        .put(
+                            "items",
+                            JSONObject()
+                                .put("type", "object")
+                                .put(
+                                    "properties",
+                                    JSONObject()
+                                        .put("channel", JSONObject().put("type", "string"))
+                                        .put(
+                                            "label",
+                                            JSONObject()
+                                                .put("type", "string")
+                                                .put("enum", JSONArray().put("safe").put("overstimulating").put("addictive").put("unknown"))
+                                        )
+                                        .put("reason", JSONObject().put("type", "string"))
+                                )
+                                .put("required", JSONArray().put("channel").put("label").put("reason"))
+                                .put("additionalProperties", false)
+                        )
+                )
+            )
+            .put("required", JSONArray().put("assessments"))
+            .put("additionalProperties", false)
         val payload = JSONObject()
-            .put("model", "gpt-4o-mini")
+            .put("model", MODEL_NAME)
             .put(
                 "messages",
                 JSONArray()
                     .put(JSONObject().put("role", "system").put("content", "You are a child safety content classifier."))
                     .put(JSONObject().put("role", "user").put("content", prompt))
+            )
+            .put(
+                "response_format",
+                JSONObject()
+                    .put("type", "json_schema")
+                    .put(
+                        "json_schema",
+                        JSONObject()
+                            .put("name", "kidwatch_channel_assessments")
+                            .put("strict", true)
+                            .put("schema", schema)
+                    )
             )
             .put("temperature", 0.2)
 
@@ -97,8 +140,7 @@ class OpenAiContentAnalyzer {
             ?.optJSONObject("message")
             ?.optString("content")
             .orEmpty()
-
-        val parsed = runCatching { JSONObject(content) }.getOrNull()
+        val parsed = runCatching { JSONObject(extractJsonObject(content)) }.getOrNull()
         val assessments = parsed?.optJSONArray("assessments")
 
         if (assessments == null) {
@@ -118,5 +160,25 @@ class OpenAiContentAnalyzer {
         return channels.map { channel ->
             byChannel[channel] ?: AnalysisResult(channel, "unknown", "No assessment returned for channel")
         }
+    }
+
+    private fun extractJsonObject(raw: String): String {
+        val trimmed = raw.trim()
+        if (trimmed.startsWith("{") && trimmed.endsWith("}")) return trimmed
+        if (trimmed.startsWith("```")) {
+            return trimmed
+                .removePrefix("```json")
+                .removePrefix("```")
+                .removeSuffix("```")
+                .trim()
+        }
+        return trimmed
+    }
+
+    companion object {
+        const val MODEL_NAME = "gpt-4o-mini"
+        const val ANALYSIS_MODEL = "openai:gpt-4o-mini"
+
+        fun isConfigured(): Boolean = BuildConfig.OPENAI_API_KEY.isNotBlank()
     }
 }

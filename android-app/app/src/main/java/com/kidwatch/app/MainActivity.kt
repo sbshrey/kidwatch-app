@@ -1,27 +1,40 @@
 package com.kidwatch.app
 
 import android.Manifest
+import android.app.Activity
+import android.content.Context
 import android.content.Intent
 import android.provider.Settings
 import android.content.pm.PackageManager
 import android.graphics.Bitmap
+import android.media.projection.MediaProjectionManager
 import android.os.Bundle
+import android.text.InputType
 import android.util.Log
 import android.view.View
-import android.widget.ImageButton
+import android.widget.CheckBox
 import android.widget.ImageView
 import android.widget.LinearLayout
+import android.widget.RadioButton
+import android.widget.RadioGroup
 import android.widget.TextView
 import android.widget.Toast
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.appcompat.app.AlertDialog
 import androidx.appcompat.app.AppCompatActivity
+import androidx.core.content.ContextCompat
+import androidx.core.widget.NestedScrollView
 import androidx.lifecycle.lifecycleScope
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
+import androidx.recyclerview.widget.ConcatAdapter
+import androidx.recyclerview.widget.LinearLayoutManager
+import androidx.recyclerview.widget.RecyclerView
 import com.google.android.material.dialog.MaterialAlertDialogBuilder
 import com.google.android.material.bottomnavigation.BottomNavigationView
 import com.google.android.material.button.MaterialButton
 import com.google.android.material.chip.Chip
+import com.google.android.material.chip.ChipGroup
 import com.google.android.material.card.MaterialCardView
 import com.google.android.material.progressindicator.LinearProgressIndicator
 import com.google.android.material.textfield.TextInputEditText
@@ -31,17 +44,40 @@ import com.google.zxing.MultiFormatWriter
 import com.journeyapps.barcodescanner.ScanContract
 import com.journeyapps.barcodescanner.ScanOptions
 import com.google.firebase.firestore.FirebaseFirestore
+import com.kidwatch.app.analytics.AnalyticsTracker
+import com.kidwatch.app.data.local.entity.IdentityClusterEntity
+import com.kidwatch.app.data.local.entity.PersonProfileEntity
 import com.kidwatch.app.insights.AppCatalogMapper
 import com.kidwatch.app.monitoring.MonitoringScheduler
 import com.kidwatch.app.repository.DashboardRepository
 import com.kidwatch.app.repository.LocalMonitoringRepository
+import com.kidwatch.app.services.AccessibilityServiceState
+import com.kidwatch.app.services.AutoMonitoringService
 import com.kidwatch.app.services.DeviceInfoProvider
 import com.kidwatch.app.services.DeviceLinkingService
-import com.kidwatch.app.services.FaceCaptureService
+import com.kidwatch.app.services.EvidenceCaptureService
+import com.kidwatch.app.services.EvidencePreferences
+import com.kidwatch.app.services.MediaProjectionPermissionStore
 import com.kidwatch.app.services.FaceCaptureState
+import com.kidwatch.app.services.MonitoringPolicyCatalog
+import com.kidwatch.app.services.TesterProfileStore
 import com.kidwatch.app.services.UsageAccessHelper
+import com.kidwatch.app.ui.ActivityFeedFilter
+import com.kidwatch.app.ui.ActivityFeedFooterAdapter
+import com.kidwatch.app.ui.ActivityFeedHeaderAdapter
+import com.kidwatch.app.ui.ActivityFeedUiState
+import com.kidwatch.app.ui.ActivityFeedViewModel
+import com.kidwatch.app.ui.ActivityFeedViewModelFactory
+import com.kidwatch.app.ui.ActivityEvidenceUi
+import com.kidwatch.app.ui.ActivitySessionFeedAdapter
 import com.kidwatch.app.ui.DashboardUiState
 import com.kidwatch.app.ui.DashboardViewModel
+import com.kidwatch.app.ui.ManageEvidenceState
+import com.kidwatch.app.ui.ManagePersonProfileUi
+import com.kidwatch.app.ui.ManagePermissionState
+import com.kidwatch.app.ui.ManageUiState
+import com.kidwatch.app.ui.ManageViewModel
+import com.kidwatch.app.ui.ManageViewModelFactory
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import java.text.SimpleDateFormat
@@ -53,6 +89,8 @@ import org.json.JSONObject
 class MainActivity : AppCompatActivity() {
 
     private lateinit var dashboardViewModel: DashboardViewModel
+    private lateinit var activityFeedViewModel: ActivityFeedViewModel
+    private lateinit var manageViewModel: ManageViewModel
     private lateinit var dashboardRepository: DashboardRepository
 
     private lateinit var localMonitoringRepository: LocalMonitoringRepository
@@ -63,9 +101,12 @@ class MainActivity : AppCompatActivity() {
     private lateinit var dashboardLastUpdatedText: TextView
     private lateinit var bottomNav: BottomNavigationView
     private lateinit var dashboardTabContent: View
-    private lateinit var activityTabContent: View
-    private lateinit var dashboardShowQrButton: ImageButton
-    private lateinit var dashboardScanQrButton: ImageButton
+    private lateinit var activityTabContent: RecyclerView
+    private lateinit var manageTabContent: NestedScrollView
+    private lateinit var dashboardEvidenceCaptureButton: MaterialButton
+    private lateinit var btnRunMonitoringNow: MaterialButton
+    private lateinit var btnRunSyncNow: MaterialButton
+    private lateinit var dashboardManageFamilyButton: MaterialButton
     private lateinit var chipMy: Chip
     private lateinit var chipFamily: Chip
     private lateinit var dashboardMyContent: View
@@ -85,21 +126,65 @@ class MainActivity : AppCompatActivity() {
     private lateinit var insightRow1: TextView
     private lateinit var insightRow2: TextView
     private lateinit var insightRow3: TextView
-    private lateinit var faceDetectionStatusText: TextView
-    private lateinit var btnFaceDetectionPermissions: MaterialButton
-    private lateinit var videosWatchedText: TextView
-    private lateinit var btnOpenAccessibilitySettings: MaterialButton
+    private lateinit var manageStatusText: TextView
+    private lateinit var manageDeviceNameText: TextView
+    private lateinit var manageDeviceSummaryText: TextView
+    private lateinit var manageLinkedNamesText: TextView
+    private lateinit var manageOwnerNameText: TextView
+    private lateinit var btnManageEditOwner: MaterialButton
+    private lateinit var manageTesterSummaryText: TextView
+    private lateinit var manageTesterMetaText: TextView
+    private lateinit var btnManageEditTester: MaterialButton
+    private lateinit var manageChildrenEmptyText: TextView
+    private lateinit var manageChildrenContainer: LinearLayout
+    private lateinit var btnManageAddChild: MaterialButton
+    private lateinit var btnManageShowQr: MaterialButton
+    private lateinit var btnManageScanQr: MaterialButton
+    private lateinit var manageSectionThisDevice: View
+    private lateinit var manageSectionMonitoringApps: View
+    private lateinit var manageSectionUnknownViewers: View
+    private lateinit var manageSectionPermissions: View
+    private lateinit var manageMonitoringSummaryText: TextView
+    private lateinit var manageCategoryChipGroup: ChipGroup
+    private lateinit var manageUnknownClustersText: TextView
+    private lateinit var manageClusterReviewContainer: LinearLayout
+    private lateinit var manageClusterEmptyText: TextView
+    private lateinit var btnManageOpenMonitoring: MaterialButton
+    private lateinit var managePermissionsSummaryText: TextView
+    private lateinit var managePermissionsManualHintText: TextView
+    private lateinit var manageManualPermissionActions: LinearLayout
+    private lateinit var manageManualPermissionRow2: LinearLayout
+    private lateinit var btnManageProjection: MaterialButton
+    private lateinit var btnManageUsageAccess: MaterialButton
+    private lateinit var btnManageCamera: MaterialButton
+    private lateinit var btnManageAccessibility: MaterialButton
+    private lateinit var managePrivacyBodyText: TextView
+    private lateinit var btnManagePrivacy: MaterialButton
+    private lateinit var btnManageTerms: MaterialButton
+    private lateinit var btnManageEvidenceInfo: MaterialButton
+    private lateinit var btnManageDeleteEvidence: MaterialButton
+    private lateinit var btnManageClearHistory: MaterialButton
+    private lateinit var btnManageUnlinkDevice: MaterialButton
     private val topAppRows = mutableListOf<TopAppRow>()
     private val previousTopAppMinutes = mutableMapOf<String, Int>()
     private val packageByAppLabel = mutableMapOf<String, String>()
     private lateinit var deviceInfoProvider: DeviceInfoProvider
     private lateinit var deviceLinkingService: DeviceLinkingService
     private var preferredName: String = ""
-    private var isNamePromptVisible: Boolean = false
     private var hasInitializedSignedInFlow: Boolean = false
     private var hasShownSignInSuccess: Boolean = false
+    private var pendingManageSection: String? = null
+    private var pendingEvidenceStart: Boolean = false
+    private var awaitingProjectionConsent: Boolean = false
+    private var activityPermissionBannerMessage: String? = null
+    private var latestActivityFeedState: ActivityFeedUiState = ActivityFeedUiState(isInitialLoading = true)
+    private var lastTrackedTabId: Int? = null
 
-    private val profilePrefs by lazy { getSharedPreferences("profile_prefs", MODE_PRIVATE) }
+    private val profilePrefs by lazy {
+        getSharedPreferences(ProfilePreferences.PREFS_NAME, MODE_PRIVATE)
+    }
+    private val testerProfileStore by lazy { TesterProfileStore(this) }
+    private val analyticsTracker by lazy { AnalyticsTracker(this) }
 
     private data class TopAppRow(
         val container: View,
@@ -114,19 +199,68 @@ class MainActivity : AppCompatActivity() {
         val minutes: Int
     )
 
+    private enum class EvidencePrimaryAction {
+        ENABLE_AUTOMATIC,
+        REFRESH_SCREENSHOTS,
+        OPEN_MANAGE,
+        NONE
+    }
+
     private val usageAccessLauncher = registerForActivityResult(
         ActivityResultContracts.StartActivityForResult()
     ) {
         updateUsageAccessState()
-        if (hasFaceCapturePermissions()) FaceCaptureService.start(applicationContext)
-        refreshFaceCaptureStatus()
+        val usageGranted = UsageAccessHelper.hasUsageAccess(this)
+        analyticsTracker.markUsageAccessGrantedIfNeeded(usageGranted)
+        if (usageGranted) AutoMonitoringService.start(applicationContext)
+        if (pendingEvidenceStart && UsageAccessHelper.hasUsageAccess(this)) {
+            continueEvidenceStartFlow()
+        } else if (pendingEvidenceStart && !UsageAccessHelper.hasUsageAccess(this)) {
+            pendingEvidenceStart = false
+        }
+        activityFeedViewModel.loadFeed()
+        refreshActivityFeedBanner()
+        manageViewModel.load(preferredName)
     }
 
     private val cameraPermissionLauncher = registerForActivityResult(
         ActivityResultContracts.RequestPermission()
     ) { granted ->
-        if (granted) FaceCaptureService.start(applicationContext)
-        refreshFaceCaptureStatus()
+        EvidencePreferences.setCameraCaptureEnabled(this, granted)
+        analyticsTracker.markCameraGrantedIfNeeded(granted)
+        if (UsageAccessHelper.hasUsageAccess(this)) AutoMonitoringService.start(applicationContext)
+        if (granted && EvidencePreferences.isAutomaticEvidenceEnabled(this)) {
+            EvidenceCaptureService.start(applicationContext)
+        }
+        if (pendingEvidenceStart && granted) {
+            continueEvidenceStartFlow()
+        } else if (pendingEvidenceStart && !granted) {
+            pendingEvidenceStart = false
+        }
+        refreshActivityFeedBanner()
+        manageViewModel.load(preferredName)
+    }
+
+    private val projectionLauncher = registerForActivityResult(
+        ActivityResultContracts.StartActivityForResult()
+    ) { result ->
+        awaitingProjectionConsent = false
+        val data = result.data
+        if (result.resultCode == Activity.RESULT_OK && data != null) {
+            MediaProjectionPermissionStore.store(result.resultCode, data)
+            EvidencePreferences.setScreenCaptureConfigured(this, true)
+            EvidencePreferences.setScreenCaptureCurrentlyAvailable(this, true)
+            if (pendingEvidenceStart) {
+                enableAutomaticEvidence(showToast = true)
+            } else {
+                EvidenceCaptureService.start(applicationContext)
+                Toast.makeText(this, getString(R.string.evidence_projection_refreshed), Toast.LENGTH_SHORT).show()
+            }
+        } else {
+            pendingEvidenceStart = false
+        }
+        refreshActivityFeedBanner()
+        manageViewModel.load(preferredName)
     }
 
     private val qrScanLauncher = registerForActivityResult(ScanContract()) { result ->
@@ -135,17 +269,39 @@ class MainActivity : AppCompatActivity() {
         handleScannedDeviceQr(raw)
     }
 
+    private lateinit var activityFeedAdapter: ActivitySessionFeedAdapter
+    private lateinit var activityFeedHeaderAdapter: ActivityFeedHeaderAdapter
+    private lateinit var activityFeedFooterAdapter: ActivityFeedFooterAdapter
+    private lateinit var activityFeedConcatAdapter: ConcatAdapter
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        analyticsTracker.noteAppOpen()
+        testerProfileStore.ensureInstallState()
+        preferredName = profilePrefs.getString(ProfilePreferences.PREF_PREFERRED_NAME, "").orEmpty()
+        if (preferredName.isBlank() || !testerProfileStore.hasCompleteTesterProfile()) {
+            startActivity(Intent(this, OnboardingActivity::class.java))
+            finish()
+            return
+        }
+
         setContentView(R.layout.activity_main)
+        pendingManageSection = intent.getStringExtra(EXTRA_OPEN_SECTION)
 
         bindViews()
-        setupBottomNavigation()
         initViewModels()
+        setupBottomNavigation()
         observeState()
         updateUsageAccessState()
-        preferredName = profilePrefs.getString(PREF_PREFERRED_NAME, "").orEmpty()
-        promptForPreferredNameIfNeeded()
+        lifecycleScope.launch {
+            val cleanupSummary = localMonitoringRepository.purgeInvalidEvidence()
+            val scrubbedLinkCount = localMonitoringRepository.scrubInferredVideoLinks()
+            if (cleanupSummary.totalRemoved > 0 || scrubbedLinkCount > 0) {
+                activityFeedViewModel.loadFeed()
+                manageViewModel.load(preferredName)
+                scheduleDashboardRefresh()
+            }
+        }
 
         chipMy.setOnClickListener { showDashboardMy() }
         chipFamily.setOnClickListener { showDashboardFamily() }
@@ -159,27 +315,91 @@ class MainActivity : AppCompatActivity() {
             openTopAppsScreen()
         }
         insightRow1.setOnClickListener {
-            openTopAppsScreen(packageFilter = "com.google.android.youtube", query = "YouTube")
+            openActivityFeed(ActivityFeedFilter.CONTENT_APPS)
         }
         insightRow2.setOnClickListener {
-            openTopAppsScreen(packageFilter = "com.google.android.youtube", query = "YouTube")
+            openActivityFeed(ActivityFeedFilter.CONTENT_APPS)
         }
         insightRow3.setOnClickListener {
-            openTopAppsScreen(packageFilter = "com.google.android.youtube", query = "YouTube")
+            openActivityFeed(ActivityFeedFilter.CONTENT_APPS)
         }
-        dashboardShowQrButton.setOnClickListener { showMyDeviceQr() }
-        dashboardScanQrButton.setOnClickListener { scanFamilyDeviceQr() }
-        btnFaceDetectionPermissions.setOnClickListener { requestFaceCapturePermissions() }
-        btnOpenAccessibilitySettings.setOnClickListener {
+        dashboardManageFamilyButton.setOnClickListener { openManageSection(MANAGE_SECTION_THIS_DEVICE) }
+        dashboardEvidenceCaptureButton.setOnClickListener { handleDashboardEvidenceAction() }
+        btnRunMonitoringNow.setOnClickListener {
+            MonitoringScheduler.runMonitoringNow(applicationContext)
+            Toast.makeText(this, getString(R.string.run_now_enqueued), Toast.LENGTH_SHORT).show()
+            scheduleDashboardRefresh()
+        }
+        btnRunSyncNow.setOnClickListener {
+            MonitoringScheduler.runSyncNow(applicationContext)
+            Toast.makeText(this, getString(R.string.run_now_enqueued), Toast.LENGTH_SHORT).show()
+            scheduleDashboardRefresh()
+        }
+        btnManageShowQr.setOnClickListener { showMyDeviceQr() }
+        btnManageScanQr.setOnClickListener { scanFamilyDeviceQr() }
+        btnManageEditOwner.setOnClickListener { showEditOwnerDialog() }
+        btnManageEditTester.setOnClickListener { showEditTesterDialog() }
+        btnManageAddChild.setOnClickListener { showChildProfileDialog() }
+        btnManageOpenMonitoring.setOnClickListener {
+            startActivity(Intent(this, MonitoringAppsActivity::class.java))
+        }
+        btnManageProjection.setOnClickListener { handleManageEvidenceAction() }
+        btnManageUsageAccess.setOnClickListener {
+            usageAccessLauncher.launch(UsageAccessHelper.createUsageAccessIntent())
+        }
+        btnManageCamera.setOnClickListener {
+            if (hasCameraPermission()) {
+                manageViewModel.load(preferredName)
+            } else {
+                cameraPermissionLauncher.launch(Manifest.permission.CAMERA)
+            }
+        }
+        btnManageAccessibility.setOnClickListener {
             startActivity(Intent(Settings.ACTION_ACCESSIBILITY_SETTINGS))
         }
+        btnManagePrivacy.setOnClickListener {
+            startActivity(LegalDocumentActivity.createIntent(this, LegalDocumentActivity.TYPE_PRIVACY))
+        }
+        btnManageTerms.setOnClickListener {
+            startActivity(LegalDocumentActivity.createIntent(this, LegalDocumentActivity.TYPE_TERMS))
+        }
+        btnManageEvidenceInfo.setOnClickListener {
+            startActivity(LegalDocumentActivity.createIntent(this, LegalDocumentActivity.TYPE_EVIDENCE))
+        }
+        btnManageDeleteEvidence.setOnClickListener { confirmDeleteEvidence() }
+        btnManageClearHistory.setOnClickListener { confirmClearMonitoringHistory() }
+        btnManageUnlinkDevice.setOnClickListener { confirmUnlinkThisDevice() }
         onSignedIn()
     }
 
     override fun onResume() {
         super.onResume()
-        refreshFaceCaptureStatus()
-        refreshVideosWatchedCard()
+        EvidencePreferences.syncScreenCaptureAvailability(this, MediaProjectionPermissionStore.hasGrant())
+        analyticsTracker.markAccessibilityEnabledIfNeeded(AccessibilityServiceState.isContentCaptureEnabled(this))
+        analyticsTracker.markCameraGrantedIfNeeded(hasCameraPermission())
+        analyticsTracker.markAutomaticEvidenceEnabledIfNeeded(EvidencePreferences.isAutomaticEvidenceEnabled(this))
+        if (
+            pendingEvidenceStart &&
+            !awaitingProjectionConsent &&
+            AccessibilityServiceState.isContentCaptureEnabled(this)
+        ) {
+            continueEvidenceStartFlow()
+        }
+        activityFeedViewModel.loadFeed()
+        refreshActivityFeedBanner()
+        manageViewModel.load(preferredName)
+    }
+
+    override fun onNewIntent(intent: Intent) {
+        super.onNewIntent(intent)
+        setIntent(intent)
+        val requestedTab = intent.getIntExtra(EXTRA_OPEN_TAB, bottomNav.selectedItemId)
+        pendingManageSection = intent.getStringExtra(EXTRA_OPEN_SECTION)
+        if (bottomNav.selectedItemId == requestedTab) {
+            showTab(requestedTab)
+        } else {
+            bottomNav.selectedItemId = requestedTab
+        }
     }
 
     private fun bindViews() {
@@ -189,14 +409,17 @@ class MainActivity : AppCompatActivity() {
         dashboardMyContent = findViewById(R.id.dashboardMyContent)
         dashboardFamilyContent = findViewById(R.id.dashboardFamilyContent)
         dashboardStatusText = findViewById(R.id.tvDashboardStatus)
+        dashboardEvidenceCaptureButton = findViewById(R.id.btnDashboardEvidenceCapture)
         dashboardTodayText = findViewById(R.id.tvTodayUsage)
         dashboardTopAppsText = findViewById(R.id.tvTopApps)
         dashboardLastUpdatedText = findViewById(R.id.tvLastUpdated)
         bottomNav = findViewById(R.id.bottomNav)
         dashboardTabContent = findViewById(R.id.dashboardTabContent)
         activityTabContent = findViewById(R.id.activityTabContent)
-        dashboardShowQrButton = findViewById(R.id.btnDashboardShowQr)
-        dashboardScanQrButton = findViewById(R.id.btnDashboardScanQr)
+        manageTabContent = findViewById(R.id.manageTabContent)
+        btnRunMonitoringNow = findViewById(R.id.btnRunMonitoringNow)
+        btnRunSyncNow = findViewById(R.id.btnRunSyncNow)
+        dashboardManageFamilyButton = findViewById(R.id.btnDashboardManageFamily)
         familyDashboardStatusText = findViewById(R.id.tvFamilyDashboardStatus)
         familyDevicesUsageContainer = findViewById(R.id.familyDevicesUsageContainer)
         topAppsCard = findViewById(R.id.topAppsCard)
@@ -212,10 +435,79 @@ class MainActivity : AppCompatActivity() {
         insightRow1 = findViewById(R.id.tvInsightRow1)
         insightRow2 = findViewById(R.id.tvInsightRow2)
         insightRow3 = findViewById(R.id.tvInsightRow3)
-        faceDetectionStatusText = findViewById(R.id.tvFaceDetectionStatus)
-        btnFaceDetectionPermissions = findViewById(R.id.btnFaceDetectionPermissions)
-        videosWatchedText = findViewById(R.id.tvVideosWatched)
-        btnOpenAccessibilitySettings = findViewById(R.id.btnOpenAccessibilitySettings)
+        manageStatusText = findViewById(R.id.tvManageStatus)
+        manageDeviceNameText = findViewById(R.id.tvManageDeviceName)
+        manageDeviceSummaryText = findViewById(R.id.tvManageDeviceSummary)
+        manageLinkedNamesText = findViewById(R.id.tvManageLinkedNames)
+        manageOwnerNameText = findViewById(R.id.tvManageOwnerName)
+        btnManageEditOwner = findViewById(R.id.btnManageEditOwner)
+        manageTesterSummaryText = findViewById(R.id.tvManageTesterSummary)
+        manageTesterMetaText = findViewById(R.id.tvManageTesterMeta)
+        btnManageEditTester = findViewById(R.id.btnManageEditTester)
+        manageChildrenEmptyText = findViewById(R.id.tvManageChildrenEmpty)
+        manageChildrenContainer = findViewById(R.id.layoutManageChildren)
+        btnManageAddChild = findViewById(R.id.btnManageAddChild)
+        btnManageShowQr = findViewById(R.id.btnManageShowQr)
+        btnManageScanQr = findViewById(R.id.btnManageScanQr)
+        manageSectionThisDevice = findViewById(R.id.manageSectionThisDevice)
+        manageSectionMonitoringApps = findViewById(R.id.manageSectionMonitoringApps)
+        manageSectionUnknownViewers = findViewById(R.id.manageSectionUnknownViewers)
+        manageSectionPermissions = findViewById(R.id.manageSectionPermissions)
+        manageMonitoringSummaryText = findViewById(R.id.tvManageMonitoringSummary)
+        manageCategoryChipGroup = findViewById(R.id.manageCategoryChipGroup)
+        manageUnknownClustersText = findViewById(R.id.tvManageUnknownClusters)
+        manageClusterReviewContainer = findViewById(R.id.manageClusterReviewContainer)
+        manageClusterEmptyText = findViewById(R.id.tvManageClusterEmpty)
+        btnManageOpenMonitoring = findViewById(R.id.btnManageOpenMonitoring)
+        managePermissionsSummaryText = findViewById(R.id.tvManagePermissionsSummary)
+        managePermissionsManualHintText = findViewById(R.id.tvManagePermissionsManualHint)
+        manageManualPermissionActions = findViewById(R.id.layoutManageManualPermissionActions)
+        manageManualPermissionRow2 = findViewById(R.id.layoutManageManualPermissionRow2)
+        btnManageProjection = findViewById(R.id.btnManageProjection)
+        btnManageUsageAccess = findViewById(R.id.btnManageUsageAccess)
+        btnManageCamera = findViewById(R.id.btnManageCamera)
+        btnManageAccessibility = findViewById(R.id.btnManageAccessibility)
+        managePrivacyBodyText = findViewById(R.id.tvManagePrivacyBody)
+        btnManagePrivacy = findViewById(R.id.btnManagePrivacy)
+        btnManageTerms = findViewById(R.id.btnManageTerms)
+        btnManageEvidenceInfo = findViewById(R.id.btnManageEvidenceInfo)
+        btnManageDeleteEvidence = findViewById(R.id.btnManageDeleteEvidence)
+        btnManageClearHistory = findViewById(R.id.btnManageClearHistory)
+        btnManageUnlinkDevice = findViewById(R.id.btnManageUnlinkDevice)
+        activityFeedHeaderAdapter = ActivityFeedHeaderAdapter(
+            onOpenManage = { openManageSection() },
+            onRefresh = {
+                activityTabContent.scrollToPosition(0)
+                activityFeedViewModel.refresh()
+            },
+            onFilterSelected = { filter ->
+                activityTabContent.scrollToPosition(0)
+                activityFeedViewModel.setFilter(filter)
+            }
+        )
+        activityFeedFooterAdapter = ActivityFeedFooterAdapter(
+            onRetry = { activityFeedViewModel.retryPageLoad() }
+        )
+        activityFeedAdapter = ActivitySessionFeedAdapter(this) { openSessionDetail(it.id) }
+        activityFeedConcatAdapter = ConcatAdapter(
+            activityFeedHeaderAdapter,
+            activityFeedAdapter,
+            activityFeedFooterAdapter
+        )
+        activityTabContent.layoutManager = LinearLayoutManager(this)
+        activityTabContent.adapter = activityFeedConcatAdapter
+        activityTabContent.addOnScrollListener(object : RecyclerView.OnScrollListener() {
+            override fun onScrolled(recyclerView: RecyclerView, dx: Int, dy: Int) {
+                super.onScrolled(recyclerView, dx, dy)
+                if (dy <= 0) return
+                val layoutManager = recyclerView.layoutManager as? LinearLayoutManager ?: return
+                val lastVisible = layoutManager.findLastVisibleItemPosition()
+                val totalItems = activityFeedConcatAdapter.itemCount
+                if (totalItems - lastVisible <= FEED_LOAD_MORE_THRESHOLD) {
+                    activityFeedViewModel.loadNextPage()
+                }
+            }
+        })
         topAppRows.clear()
         topAppRows += TopAppRow(
             container = findViewById(R.id.topAppRow1),
@@ -254,37 +546,70 @@ class MainActivity : AppCompatActivity() {
                 localMonitoringRepository = localMonitoringRepository
             )
         )[DashboardViewModel::class.java]
+        activityFeedViewModel = ViewModelProvider(
+            this,
+            ActivityFeedViewModelFactory(localMonitoringRepository)
+        )[ActivityFeedViewModel::class.java]
+        manageViewModel = ViewModelProvider(
+            this,
+            ManageViewModelFactory(
+                appContext = applicationContext,
+                repository = localMonitoringRepository,
+                deviceInfoProvider = deviceInfoProvider,
+                deviceLinkingService = deviceLinkingService
+            )
+        )[ManageViewModel::class.java]
     }
 
     private fun observeState() {
         dashboardViewModel.uiState.observe(this) { state ->
             renderDashboard(state)
         }
+        activityFeedViewModel.uiState.observe(this) { state ->
+            renderActivityFeed(state)
+        }
+        manageViewModel.uiState.observe(this) { state ->
+            renderManage(state)
+        }
     }
 
     private fun onSignedIn() {
         updateUsageAccessState()
+        analyticsTracker.markUsageAccessGrantedIfNeeded(UsageAccessHelper.hasUsageAccess(this))
+        analyticsTracker.markAccessibilityEnabledIfNeeded(AccessibilityServiceState.isContentCaptureEnabled(this))
+        analyticsTracker.markCameraGrantedIfNeeded(hasCameraPermission())
+        analyticsTracker.markAutomaticEvidenceEnabledIfNeeded(EvidencePreferences.isAutomaticEvidenceEnabled(this))
         if (!hasShownSignInSuccess) {
-            Toast.makeText(this, "Device ready", Toast.LENGTH_SHORT).show()
+            Toast.makeText(this, getString(R.string.device_ready_toast), Toast.LENGTH_SHORT).show()
             hasShownSignInSuccess = true
         }
         if (hasInitializedSignedInFlow) return
         hasInitializedSignedInFlow = true
         val deviceId = deviceInfoProvider.getDeviceInfo().deviceId
         MonitoringScheduler.schedule(applicationContext)
-        if (hasFaceCapturePermissions()) {
-            FaceCaptureService.start(applicationContext)
+        if (UsageAccessHelper.hasUsageAccess(this)) {
+            AutoMonitoringService.start(applicationContext)
+        }
+        if (EvidencePreferences.isAutomaticEvidenceEnabled(this)) {
+            EvidencePreferences.setCameraCaptureEnabled(this, hasCameraPermission())
+            EvidencePreferences.syncScreenCaptureAvailability(this, MediaProjectionPermissionStore.hasGrant())
+            EvidenceCaptureService.start(applicationContext)
+        }
+        lifecycleScope.launch {
+            localMonitoringRepository.syncMonitoredAppPolicies()
         }
         dashboardViewModel.loadSummary(deviceId)
+        activityFeedViewModel.loadFeed()
+        manageViewModel.load(preferredName)
         refreshFamilyDashboardData()
         refreshInsightsCard()
         updateDashboardGreeting()
+        refreshActivityFeedBanner()
     }
 
     private fun renderDashboard(state: DashboardUiState) {
         if (state.isLoading) {
-            dashboardStatusText.visibility = View.VISIBLE
-            dashboardStatusText.text = getString(R.string.dashboard_loading)
+            showDashboardStatus(getString(R.string.dashboard_loading))
             topAppsSkeleton.visibility = View.VISIBLE
             topAppsList.visibility = View.GONE
             topAppsEmptyState.visibility = View.GONE
@@ -295,17 +620,15 @@ class MainActivity : AppCompatActivity() {
             return
         }
 
-        if (!state.errorMessage.isNullOrBlank()) {
-            dashboardStatusText.visibility = View.VISIBLE
-            dashboardStatusText.text = state.errorMessage
-        } else {
-            dashboardStatusText.visibility = View.GONE
-        }
+        val topAppEntries = parseTopApps(state.topAppsText)
+        val dashboardMessage = state.errorMessage?.takeIf { it.isNotBlank() }
+            ?: resolveDashboardGuidance(state, topAppEntries)
+        showDashboardStatus(dashboardMessage)
 
         dashboardTodayText.text = getString(R.string.dashboard_today_usage, state.totalUsageMinutes)
         dashboardTopAppsText.text = getString(R.string.dashboard_top_apps, state.topAppsText)
-        renderKpiChips(state)
-        renderTopAppsRows(state.topAppsText)
+        renderKpiChips(state, topAppEntries)
+        renderTopAppsRows(topAppEntries)
         refreshInsightsCard()
         val lastUpdated = state.lastUpdatedAtMillis
         if (lastUpdated != null) {
@@ -316,81 +639,836 @@ class MainActivity : AppCompatActivity() {
         }
     }
 
-    private fun hasFaceCapturePermissions(): Boolean {
-        val hasCamera = if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.M) {
-            checkSelfPermission(Manifest.permission.CAMERA) == PackageManager.PERMISSION_GRANTED
-        } else true
-        return hasCamera && UsageAccessHelper.hasUsageAccess(this)
-    }
-
     private fun hasCameraPermission(): Boolean {
         return if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.M) {
             checkSelfPermission(Manifest.permission.CAMERA) == PackageManager.PERMISSION_GRANTED
         } else true
     }
 
-    private fun refreshVideosWatchedCard() {
-        if (!::videosWatchedText.isInitialized) return
-        lifecycleScope.launch {
-            val events = runCatching {
-                localMonitoringRepository.getRecentVideoEvents(15)
-            }.getOrElse { emptyList() }
-            videosWatchedText.text = if (events.isEmpty()) {
-                getString(R.string.videos_watched_empty)
-            } else {
-                events.joinToString("\n") { e ->
-                    getString(R.string.videos_watched_item, e.title, e.channel)
-                }
+    private fun renderActivityFeed(state: ActivityFeedUiState) {
+        latestActivityFeedState = state
+        activityFeedHeaderAdapter.submitState(state, activityPermissionBannerMessage)
+        activityFeedAdapter.submitList(state.sessions)
+        activityFeedFooterAdapter.submitState(state)
+        refreshActivityFeedBanner()
+    }
+
+    private fun renderManage(state: ManageUiState) {
+        if (state.isLoading) {
+            manageStatusText.text = getString(R.string.dashboard_loading)
+            return
+        }
+
+        val monitoringSummary = state.monitoringSummary
+        manageDeviceNameText.text = state.deviceName.ifBlank {
+            deviceInfoProvider.getDeviceInfo().deviceName
+        }
+        manageDeviceSummaryText.text = when (state.linkedDevices.size) {
+            0 -> getString(R.string.manage_device_summary_none)
+            1 -> getString(R.string.manage_device_summary_one, state.linkedDevices.size)
+            else -> getString(R.string.manage_device_summary_many, state.linkedDevices.size)
+        }
+        manageLinkedNamesText.text = if (state.linkedDevices.isEmpty()) {
+            ""
+        } else {
+            getString(
+                R.string.manage_device_linked_names,
+                state.linkedDevices.take(3).joinToString(", ") { it.displayName }
+            )
+        }
+        manageLinkedNamesText.visibility = if (state.linkedDevices.isEmpty()) View.GONE else View.VISIBLE
+        val testerProfile = state.testerProfile
+        manageTesterSummaryText.text = testerProfile?.let {
+            getString(R.string.manage_tester_display, it.testerName, it.maskedPhone)
+        } ?: getString(R.string.manage_tester_missing)
+        manageTesterMetaText.text = testerProfile?.let {
+            getString(R.string.manage_tester_meta, it.testCohort)
+        } ?: getString(R.string.manage_tester_meta, testerProfileStore.getState().testCohort)
+        renderManageProfiles(state)
+
+        if (monitoringSummary == null) {
+            manageMonitoringSummaryText.text = state.errorMessage ?: getString(R.string.dashboard_unavailable)
+            manageUnknownClustersText.text = state.errorMessage ?: getString(R.string.dashboard_unavailable)
+            manageClusterReviewContainer.removeAllViews()
+            manageClusterEmptyText.visibility = View.VISIBLE
+            manageCategoryChipGroup.removeAllViews()
+            managePermissionsSummaryText.text = state.errorMessage ?: getString(R.string.dashboard_unavailable)
+            manageStatusText.text = state.errorMessage ?: getString(R.string.dashboard_unavailable)
+            return
+        }
+
+        manageStatusText.text = resolveManageGuidance(state)
+        manageMonitoringSummaryText.text = getString(
+            R.string.manage_monitoring_summary,
+            monitoringSummary.trackedCount,
+            monitoringSummary.screenshotCount,
+            monitoringSummary.faceCaptureCount
+        )
+        manageUnknownClustersText.text = getString(
+            R.string.manage_monitoring_unknown_clusters,
+            state.unknownClusterCount
+        )
+        managePrivacyBodyText.text = getString(
+            R.string.manage_privacy_body,
+            state.retentionDays
+        )
+        renderManageCategoryChips(monitoringSummary.recommendedCategoryCounts)
+        managePermissionsSummaryText.text = buildManagePermissionSummary(state)
+        renderEvidenceCaptureButtons(state)
+        renderManageManualPermissionActions(state)
+        renderManageUnknownClusters(state.unknownClusters)
+        applyPendingManageSection()
+    }
+
+    private fun renderEvidenceCaptureButtons(state: ManageUiState) {
+        dashboardEvidenceCaptureButton.text = when (resolveDashboardEvidenceAction(state)) {
+            EvidencePrimaryAction.ENABLE_AUTOMATIC -> getString(R.string.evidence_projection_button_enable_auto)
+            EvidencePrimaryAction.REFRESH_SCREENSHOTS -> getString(R.string.evidence_projection_button_refresh)
+            EvidencePrimaryAction.OPEN_MANAGE -> getString(R.string.evidence_projection_button_open_manage)
+            EvidencePrimaryAction.NONE -> getString(R.string.evidence_projection_button_open_manage)
+        }
+        when (resolveManageEvidenceAction(state)) {
+            EvidencePrimaryAction.ENABLE_AUTOMATIC -> {
+                btnManageProjection.visibility = View.VISIBLE
+                btnManageProjection.text = getString(R.string.evidence_projection_button_enable_auto)
+            }
+            EvidencePrimaryAction.REFRESH_SCREENSHOTS -> {
+                btnManageProjection.visibility = View.VISIBLE
+                btnManageProjection.text = getString(R.string.evidence_projection_button_refresh)
+            }
+            else -> {
+                btnManageProjection.visibility = View.GONE
             }
         }
     }
 
-    private fun refreshFaceCaptureStatus() {
-        if (!::faceDetectionStatusText.isInitialized) return
-        val missing = mutableListOf<String>()
-        if (!hasCameraPermission()) missing.add(getString(R.string.face_detection_camera_needed))
-        if (!UsageAccessHelper.hasUsageAccess(this)) missing.add(getString(R.string.face_detection_usage_needed))
-        if (missing.isNotEmpty()) {
-            faceDetectionStatusText.text = getString(R.string.face_detection_status_permissions_hint)
-            btnFaceDetectionPermissions.visibility = View.VISIBLE
-            return
+    private fun refreshActivityFeedBanner() {
+        activityPermissionBannerMessage = when {
+            !UsageAccessHelper.hasUsageAccess(this) -> getString(R.string.activity_feed_permissions_usage)
+            !AccessibilityServiceState.isContentCaptureEnabled(this) -> getString(R.string.activity_feed_permissions_accessibility)
+            !EvidencePreferences.isAutomaticEvidenceEnabled(this) -> getString(R.string.activity_feed_permissions_auto)
+            !hasCameraPermission() -> getString(R.string.activity_feed_permissions_camera)
+            EvidencePreferences.isScreenCaptureConfigured(this) && !EvidencePreferences.isScreenCaptureCurrentlyAvailable(this) ->
+                getString(R.string.activity_feed_permissions_projection)
+            else -> null
         }
-        btnFaceDetectionPermissions.visibility = View.GONE
-        val lastAt = FaceCaptureState.lastFaceDetectedAt
-        if (lastAt == 0L) {
-            faceDetectionStatusText.text = getString(R.string.face_detection_status_no_viewer)
-            return
-        }
-        val ago = formatTimeAgo(System.currentTimeMillis() - lastAt)
-        faceDetectionStatusText.text = getString(R.string.face_detection_status_viewer_seen, ago)
+        activityFeedHeaderAdapter.submitState(latestActivityFeedState, activityPermissionBannerMessage)
     }
 
-    private fun formatTimeAgo(ms: Long): String {
-        val sec = ms / 1000
+    private fun renderManageCategoryChips(
+        categories: List<LocalMonitoringRepository.MonitoringCategorySummary>
+    ) {
+        manageCategoryChipGroup.removeAllViews()
+        categories
+            .filter { it.installedCount > 0 }
+            .forEach { category ->
+                val chip = Chip(this).apply {
+                    text = getString(
+                        R.string.monitoring_policy_chip,
+                        category.label,
+                        category.trackedCount,
+                        category.installedCount
+                    )
+                    isCheckable = false
+                    isClickable = false
+                    chipBackgroundColor = ContextCompat.getColorStateList(context, R.color.kw_card_surface_alt)
+                }
+                manageCategoryChipGroup.addView(chip)
+            }
+    }
+
+    private fun renderManageProfiles(state: ManageUiState) {
+        manageOwnerNameText.text = state.deviceOwnerProfile?.let { owner ->
+            getString(R.string.manage_owner_display, owner.name)
+        } ?: getString(R.string.manage_owner_missing)
+
+        manageChildrenContainer.removeAllViews()
+        manageChildrenEmptyText.visibility = if (state.childProfiles.isEmpty()) View.VISIBLE else View.GONE
+        state.childProfiles.forEach { profile ->
+            manageChildrenContainer.addView(createChildProfileCard(profile))
+        }
+    }
+
+    private fun createChildProfileCard(profile: ManagePersonProfileUi): View {
+        val card = MaterialCardView(this).apply {
+            styleSurfaceCard(this, altBackground = true)
+            layoutParams = LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT,
+                LinearLayout.LayoutParams.WRAP_CONTENT
+            ).apply {
+                bottomMargin = dp(10)
+            }
+            setContentPadding(dp(14), dp(14), dp(14), dp(14))
+            isClickable = true
+            isFocusable = true
+        }
+        val column = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+        }
+        column.addView(
+            createInfoRow(
+                if (profile.ageYears != null) {
+                    getString(R.string.manage_child_display, profile.name, profile.ageYears)
+                } else {
+                    profile.name
+                }
+            ).apply {
+                setTextAppearance(com.google.android.material.R.style.TextAppearance_Material3_TitleMedium)
+            }
+        )
+        column.addView(
+            createInfoRow(getString(R.string.manage_child_row_body)).apply {
+                setTextAppearance(com.google.android.material.R.style.TextAppearance_Material3_BodySmall)
+            }
+        )
+        card.addView(column)
+        card.setOnClickListener {
+            showChildProfileDialog(
+                existing = PersonProfileEntity(
+                    id = profile.id,
+                    name = profile.name,
+                    role = profile.role,
+                    ageYears = profile.ageYears,
+                    isDeviceOwner = profile.isDeviceOwner,
+                    createdAt = 0L,
+                    updatedAt = 0L
+                )
+            )
+        }
+        card.setOnLongClickListener {
+            confirmDeleteChildProfile(profile)
+            true
+        }
+        return card
+    }
+
+    private fun buildManagePermissionSummary(state: ManageUiState): String {
+        val permissions = state.permissions
+        val evidence = state.evidence
+        val lines = buildList {
+            add(
+                if (evidence.automaticEvidenceEnabled) {
+                    getString(R.string.evidence_status_auto_on)
+                } else {
+                    getString(R.string.evidence_status_auto_off)
+                }
+            )
+            add(
+                if (permissions.usageAccess) {
+                    getString(R.string.evidence_status_usage_on)
+                } else {
+                    getString(R.string.evidence_status_usage_off)
+                }
+            )
+            add(
+                if (permissions.cameraAccess) {
+                    getString(R.string.evidence_status_camera_on)
+                } else {
+                    getString(R.string.evidence_status_camera_off)
+                }
+            )
+            add(
+                if (permissions.accessibilityAccess) {
+                    getString(R.string.evidence_status_accessibility_on)
+                } else {
+                    getString(R.string.evidence_status_accessibility_off)
+                }
+            )
+            add(
+                if (evidence.cameraCaptureEnabled && permissions.cameraAccess) {
+                    getString(R.string.evidence_status_camera_capture_on)
+                } else {
+                    getString(R.string.evidence_status_camera_capture_off)
+                }
+            )
+            add(
+                if (evidence.screenCaptureCurrentlyAvailable && permissions.screenshotConsent) {
+                    getString(R.string.evidence_status_projection_on)
+                } else if (evidence.screenCaptureConfigured) {
+                    getString(R.string.evidence_status_projection_paused)
+                } else {
+                    getString(R.string.evidence_status_projection_off)
+                }
+            )
+        }
+        return lines.joinToString("\n")
+    }
+
+    private fun renderManageManualPermissionActions(state: ManageUiState) {
+        val showUsage = !state.permissions.usageAccess
+        val showCamera = !state.permissions.cameraAccess
+        val showAccessibility = !state.permissions.accessibilityAccess
+        val showProjection = resolveManageEvidenceAction(state) != EvidencePrimaryAction.NONE
+        val showManualFallbacks = showUsage || showCamera || showAccessibility || showProjection
+
+        managePermissionsManualHintText.visibility = if (showManualFallbacks) View.VISIBLE else View.GONE
+        manageManualPermissionActions.visibility = if (showManualFallbacks) View.VISIBLE else View.GONE
+        manageManualPermissionRow2.visibility = if (showAccessibility) View.VISIBLE else View.GONE
+
+        btnManageProjection.visibility = if (showProjection) View.VISIBLE else View.GONE
+        btnManageUsageAccess.visibility = if (showUsage) View.VISIBLE else View.GONE
+        btnManageCamera.visibility = if (showCamera) View.VISIBLE else View.GONE
+        btnManageAccessibility.visibility = if (showAccessibility) View.VISIBLE else View.GONE
+    }
+
+    private fun resolveManageGuidance(state: ManageUiState): String {
         return when {
-            sec < 60 -> getString(R.string.time_ago_seconds, sec)
-            else -> getString(R.string.time_ago_minutes, sec / 60)
+            !state.permissions.usageAccess -> getString(R.string.manage_guidance_usage)
+            !state.permissions.accessibilityAccess -> getString(R.string.manage_guidance_accessibility)
+            !state.evidence.automaticEvidenceEnabled -> getString(R.string.manage_guidance_enable_automatic)
+            !state.permissions.cameraAccess -> getString(R.string.manage_guidance_camera)
+            state.evidence.screenCaptureConfigured && !state.evidence.screenCaptureCurrentlyAvailable ->
+                getString(R.string.manage_guidance_projection)
+            state.unknownClusterCount > 0 -> getString(
+                R.string.manage_guidance_unknown_viewers,
+                state.unknownClusterCount
+            )
+            state.childProfiles.isEmpty() -> getString(R.string.manage_guidance_add_children)
+            state.linkedDevices.isEmpty() -> getString(R.string.manage_guidance_link_devices)
+            state.monitoringSummary?.trackedCount == 0 -> getString(R.string.manage_guidance_pick_apps)
+            else -> getString(R.string.manage_guidance_ready)
         }
     }
 
-    private fun requestFaceCapturePermissions() {
+    private fun renderManageUnknownClusters(clusters: List<IdentityClusterEntity>) {
+        manageClusterReviewContainer.removeAllViews()
+        manageClusterEmptyText.visibility = if (clusters.isEmpty()) View.VISIBLE else View.GONE
+        clusters.forEach { cluster ->
+            manageClusterReviewContainer.addView(createClusterView(cluster))
+        }
+    }
+
+    private fun requestProjectionConsent() {
+        val manager = getSystemService(MEDIA_PROJECTION_SERVICE) as MediaProjectionManager
+        awaitingProjectionConsent = true
+        projectionLauncher.launch(manager.createScreenCaptureIntent())
+    }
+
+    private fun handleDashboardEvidenceAction() {
+        when (resolveDashboardEvidenceAction()) {
+            EvidencePrimaryAction.ENABLE_AUTOMATIC -> startAutomaticEvidenceFlow()
+            EvidencePrimaryAction.REFRESH_SCREENSHOTS -> refreshScreenCaptureSession()
+            EvidencePrimaryAction.OPEN_MANAGE -> openManageSection(MANAGE_SECTION_PERMISSIONS)
+            EvidencePrimaryAction.NONE -> Unit
+        }
+    }
+
+    private fun handleManageEvidenceAction() {
+        when (resolveManageEvidenceAction()) {
+            EvidencePrimaryAction.ENABLE_AUTOMATIC -> startAutomaticEvidenceFlow()
+            EvidencePrimaryAction.REFRESH_SCREENSHOTS -> refreshScreenCaptureSession()
+            EvidencePrimaryAction.OPEN_MANAGE -> openManageSection(MANAGE_SECTION_PERMISSIONS)
+            EvidencePrimaryAction.NONE -> Unit
+        }
+    }
+
+    private fun startAutomaticEvidenceFlow() {
+        pendingEvidenceStart = true
+        continueEvidenceStartFlow()
+    }
+
+    private fun refreshScreenCaptureSession() {
+        if (!EvidencePreferences.isAutomaticEvidenceEnabled(this)) {
+            startAutomaticEvidenceFlow()
+            return
+        }
+        requestProjectionConsent()
+    }
+
+    private fun continueEvidenceStartFlow() {
+        if (!UsageAccessHelper.hasUsageAccess(this)) {
+            Toast.makeText(this, getString(R.string.evidence_usage_required_first), Toast.LENGTH_SHORT).show()
+            usageAccessLauncher.launch(UsageAccessHelper.createUsageAccessIntent())
+            return
+        }
+        if (!AccessibilityServiceState.isContentCaptureEnabled(this)) {
+            Toast.makeText(this, getString(R.string.evidence_accessibility_required_first), Toast.LENGTH_SHORT).show()
+            startActivity(Intent(Settings.ACTION_ACCESSIBILITY_SETTINGS))
+            return
+        }
         if (!hasCameraPermission()) {
             cameraPermissionLauncher.launch(Manifest.permission.CAMERA)
             return
         }
-        if (!UsageAccessHelper.hasUsageAccess(this)) {
-            usageAccessLauncher.launch(UsageAccessHelper.createUsageAccessIntent())
+        if (MediaProjectionPermissionStore.hasGrant()) {
+            enableAutomaticEvidence(showToast = true)
+        } else {
+            requestProjectionConsent()
+        }
+    }
+
+    private fun enableAutomaticEvidence(showToast: Boolean) {
+        pendingEvidenceStart = false
+        val hasProjectionGrant = MediaProjectionPermissionStore.hasGrant()
+        EvidencePreferences.markAutomaticEvidenceConfigured(
+            context = this,
+            cameraCaptureEnabled = hasCameraPermission(),
+            screenCaptureConfigured = hasProjectionGrant || EvidencePreferences.isScreenCaptureConfigured(this),
+            screenCaptureCurrentlyAvailable = hasProjectionGrant
+        )
+        analyticsTracker.markAutomaticEvidenceEnabledIfNeeded(true)
+        AutoMonitoringService.start(applicationContext)
+        EvidenceCaptureService.start(applicationContext)
+        if (showToast) {
+            Toast.makeText(this, getString(R.string.evidence_projection_enabled), Toast.LENGTH_SHORT).show()
+        }
+        refreshActivityFeedBanner()
+        manageViewModel.load(preferredName)
+    }
+
+    private fun resolveDashboardEvidenceAction(state: ManageUiState? = manageViewModel.uiState.value): EvidencePrimaryAction {
+        val permissions = state?.permissions ?: snapshotPermissionState()
+        val evidence = state?.evidence ?: snapshotEvidenceState()
+        return when {
+            !permissions.usageAccess ||
+                !permissions.accessibilityAccess ||
+                !permissions.cameraAccess ||
+                !evidence.automaticEvidenceEnabled -> EvidencePrimaryAction.ENABLE_AUTOMATIC
+            evidence.screenCaptureConfigured && !evidence.screenCaptureCurrentlyAvailable ->
+                EvidencePrimaryAction.REFRESH_SCREENSHOTS
+            else -> EvidencePrimaryAction.OPEN_MANAGE
+        }
+    }
+
+    private fun resolveManageEvidenceAction(state: ManageUiState? = manageViewModel.uiState.value): EvidencePrimaryAction {
+        val permissions = state?.permissions ?: snapshotPermissionState()
+        val evidence = state?.evidence ?: snapshotEvidenceState()
+        return when {
+            !permissions.usageAccess ||
+                !permissions.accessibilityAccess ||
+                !permissions.cameraAccess ||
+                !evidence.automaticEvidenceEnabled -> EvidencePrimaryAction.ENABLE_AUTOMATIC
+            evidence.screenCaptureConfigured && !evidence.screenCaptureCurrentlyAvailable ->
+                EvidencePrimaryAction.REFRESH_SCREENSHOTS
+            else -> EvidencePrimaryAction.NONE
+        }
+    }
+
+    private fun snapshotPermissionState(): ManagePermissionState {
+        return ManagePermissionState(
+            usageAccess = UsageAccessHelper.hasUsageAccess(this),
+            cameraAccess = hasCameraPermission(),
+            accessibilityAccess = AccessibilityServiceState.isContentCaptureEnabled(this),
+            screenshotConsent = MediaProjectionPermissionStore.hasGrant()
+        )
+    }
+
+    private fun snapshotEvidenceState(): ManageEvidenceState {
+        return ManageEvidenceState(
+            automaticEvidenceEnabled = EvidencePreferences.isAutomaticEvidenceEnabled(this),
+            automaticEvidenceEnabledAt = EvidencePreferences.getAutomaticEvidenceEnabledAt(this),
+            cameraCaptureEnabled = EvidencePreferences.isCameraCaptureEnabled(this),
+            screenCaptureConfigured = EvidencePreferences.isScreenCaptureConfigured(this),
+            screenCaptureCurrentlyAvailable = EvidencePreferences.isScreenCaptureCurrentlyAvailable(this) &&
+                MediaProjectionPermissionStore.hasGrant()
+        )
+    }
+
+    private fun createClusterView(cluster: IdentityClusterEntity): View {
+        val row = layoutInflater.inflate(R.layout.item_evidence_cluster, manageClusterReviewContainer, false)
+        val preview = row.findViewById<ImageView>(R.id.ivClusterPreview)
+        val title = row.findViewById<TextView>(R.id.tvClusterTitle)
+        val body = row.findViewById<TextView>(R.id.tvClusterBody)
+        title.text = getString(R.string.evidence_unknown_cluster_title)
+        body.text = getString(R.string.evidence_unknown_cluster_body, cluster.sampleCount)
+
+        val bitmap = ActivityEvidenceUi.loadBitmap(cluster.representativeCropPath, 180, 180)
+        if (bitmap != null) {
+            preview.setImageBitmap(bitmap)
+            preview.scaleType = ImageView.ScaleType.CENTER_CROP
+            preview.setPadding(0, 0, 0, 0)
+            preview.setOnClickListener {
+                cluster.representativeCropPath?.let { imagePath ->
+                    startActivity(
+                        EvidenceImageViewerActivity.createIntent(
+                            context = this,
+                            imagePath = imagePath,
+                            title = getString(R.string.evidence_unknown_cluster_title),
+                            subtitle = getString(
+                                R.string.evidence_unknown_cluster_body,
+                                cluster.sampleCount
+                            )
+                        )
+                    )
+                }
+            }
+        } else {
+            preview.setImageResource(R.drawable.ic_placeholder_apps)
+            preview.scaleType = ImageView.ScaleType.CENTER_INSIDE
+            preview.setPadding(dp(14), dp(14), dp(14), dp(14))
+            preview.setOnClickListener(null)
+        }
+
+        row.findViewById<View>(R.id.btnClusterLabel).setOnClickListener {
+            showLabelDialog(cluster)
+        }
+        return row
+    }
+
+    private fun showLabelDialog(cluster: IdentityClusterEntity) {
+        val container = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+            setPadding(dp(4), dp(8), dp(4), 0)
+        }
+        val input = TextInputEditText(this).apply {
+            hint = getString(R.string.evidence_label_name_hint)
+            setText(cluster.label.orEmpty())
+        }
+        val ageInput = TextInputEditText(this).apply {
+            hint = getString(R.string.manage_child_age_hint)
+            inputType = InputType.TYPE_CLASS_NUMBER
+        }
+        val radioGroup = RadioGroup(this).apply {
+            orientation = RadioGroup.VERTICAL
+        }
+        val ownerCheckbox = CheckBox(this).apply {
+            text = getString(R.string.evidence_label_use_device_owner)
+            visibility = View.GONE
+        }
+        val roleValues = listOf(
+            "child" to getString(R.string.evidence_role_child),
+            "parent" to getString(R.string.evidence_role_parent),
+            "caregiver" to getString(R.string.evidence_role_caregiver),
+            "other" to getString(R.string.evidence_role_other)
+        )
+        roleValues.forEachIndexed { index, (_, label) ->
+            radioGroup.addView(
+                RadioButton(this).apply {
+                    id = View.generateViewId()
+                    text = label
+                    isChecked = roleValues[index].first == cluster.role ||
+                        (cluster.role.isBlank() && index == 0)
+                }
+            )
+        }
+        container.addView(input)
+        container.addView(ageInput)
+        container.addView(ownerCheckbox)
+        container.addView(radioGroup)
+
+        fun updateRoleFields(role: String) {
+            ageInput.visibility = if (role == "child") View.VISIBLE else View.GONE
+            ownerCheckbox.visibility = if (role == "parent") View.VISIBLE else View.GONE
+            if (role != "parent") ownerCheckbox.isChecked = false
+        }
+
+        radioGroup.setOnCheckedChangeListener { _, checkedId ->
+            val selectedRole = roleValues.getOrNull(
+                radioGroup.indexOfChild(radioGroup.findViewById(checkedId))
+            )?.first ?: "child"
+            updateRoleFields(selectedRole)
+        }
+        updateRoleFields(cluster.role)
+
+        MaterialAlertDialogBuilder(this)
+            .setTitle(getString(R.string.evidence_label_dialog_title))
+            .setView(container)
+            .setNegativeButton(android.R.string.cancel, null)
+            .setPositiveButton(R.string.evidence_label_save) { _, _ ->
+                lifecycleScope.launch {
+                    val selectedRole = roleValues.getOrNull(
+                        radioGroup.indexOfChild(radioGroup.findViewById(radioGroup.checkedRadioButtonId))
+                    )?.first ?: "child"
+                    val label = input.text?.toString().orEmpty().trim().ifBlank {
+                        when {
+                            ownerCheckbox.isChecked -> manageViewModel.uiState.value?.deviceOwnerProfile?.name
+                                ?: getString(R.string.evidence_role_parent)
+                            selectedRole == "parent" -> getString(R.string.evidence_role_parent)
+                            selectedRole == "caregiver" -> getString(R.string.evidence_role_caregiver)
+                            selectedRole == "other" -> getString(R.string.evidence_role_other)
+                            else -> getString(R.string.evidence_role_child)
+                        }
+                    }
+                    localMonitoringRepository.labelIdentityCluster(
+                        clusterId = cluster.id,
+                        label = label,
+                        role = selectedRole,
+                        ageYears = ageInput.text?.toString()?.trim()?.toIntOrNull(),
+                        useDeviceOwnerProfile = ownerCheckbox.isChecked
+                    )
+                    manageViewModel.load(preferredName)
+                    activityFeedViewModel.loadFeed()
+                }
+            }
+            .show()
+    }
+
+    private fun showEditOwnerDialog() {
+        val currentName = manageViewModel.uiState.value?.deviceOwnerProfile?.name
+            ?: preferredName
+            .ifBlank { deviceInfoProvider.getDeviceInfo().deviceName }
+        val input = TextInputEditText(this).apply {
+            hint = getString(R.string.profile_onboarding_name_hint)
+            setText(currentName)
+        }
+        MaterialAlertDialogBuilder(this)
+            .setTitle(getString(R.string.manage_owner_edit))
+            .setView(input)
+            .setNegativeButton(android.R.string.cancel, null)
+            .setPositiveButton(R.string.evidence_label_save) { _, _ ->
+                val updatedName = input.text?.toString().orEmpty().trim()
+                if (updatedName.isBlank()) return@setPositiveButton
+                lifecycleScope.launch {
+                    localMonitoringRepository.updateDeviceOwnerProfile(updatedName)
+                    preferredName = updatedName
+                    profilePrefs.edit().putString(ProfilePreferences.PREF_PREFERRED_NAME, updatedName).apply()
+                    updateDashboardGreeting()
+                    ensureLocalDeviceProfile()
+                    refreshFamilyDashboardData()
+                    manageViewModel.load(preferredName)
+                    activityFeedViewModel.loadFeed()
+                    Toast.makeText(
+                        this@MainActivity,
+                        getString(R.string.profile_name_saved, updatedName),
+                        Toast.LENGTH_SHORT
+                    ).show()
+                }
+            }
+            .show()
+    }
+
+    private fun showEditTesterDialog() {
+        val testerState = testerProfileStore.getState()
+        val container = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+            setPadding(dp(4), dp(8), dp(4), 0)
+        }
+        val helperText = createInfoRow(
+            if (testerState.phoneLast4.isBlank()) {
+                getString(R.string.manage_tester_phone_helper)
+            } else {
+                getString(R.string.manage_tester_phone_helper_existing, testerState.phoneLast4)
+            }
+        ).apply {
+            setTextAppearance(com.google.android.material.R.style.TextAppearance_Material3_BodySmall)
+        }
+        val testerNameInput = TextInputEditText(this).apply {
+            hint = getString(R.string.onboarding_tester_name_label)
+            setText(testerState.testerName)
+        }
+        val testerPhoneInput = TextInputEditText(this).apply {
+            hint = getString(R.string.onboarding_tester_phone_label)
+            inputType = InputType.TYPE_CLASS_PHONE
+        }
+        container.addView(helperText)
+        container.addView(testerNameInput)
+        container.addView(testerPhoneInput)
+
+        val dialog = MaterialAlertDialogBuilder(this)
+            .setTitle(getString(R.string.manage_tester_edit))
+            .setView(container)
+            .setNegativeButton(android.R.string.cancel, null)
+            .setPositiveButton(R.string.evidence_label_save, null)
+            .create()
+
+        dialog.setOnShowListener {
+            dialog.getButton(AlertDialog.BUTTON_POSITIVE).setOnClickListener {
+                testerNameInput.error = null
+                testerPhoneInput.error = null
+                val updatedName = testerNameInput.text?.toString().orEmpty().trim()
+                val updatedPhone = testerPhoneInput.text?.toString().orEmpty().trim()
+                if (updatedName.isBlank()) {
+                    testerNameInput.error = getString(R.string.onboarding_tester_name_required)
+                    return@setOnClickListener
+                }
+                val saveResult = runCatching {
+                    testerProfileStore.saveTesterProfile(updatedName, updatedPhone)
+                }.getOrElse { error ->
+                    testerPhoneInput.error = error.message ?: getString(R.string.onboarding_tester_phone_required)
+                    return@setOnClickListener
+                }
+                if (saveResult.wasFirstRegistration) {
+                    analyticsTracker.logTesterProfileRegistered()
+                }
+                MonitoringScheduler.runSyncNow(applicationContext)
+                manageViewModel.load(preferredName)
+                Toast.makeText(
+                    this,
+                    getString(R.string.manage_tester_saved, updatedName),
+                    Toast.LENGTH_SHORT
+                ).show()
+                dialog.dismiss()
+            }
+        }
+        dialog.show()
+    }
+
+    private fun showChildProfileDialog(existing: PersonProfileEntity? = null) {
+        val container = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+            setPadding(dp(4), dp(8), dp(4), 0)
+        }
+        val nameInput = TextInputEditText(this).apply {
+            hint = getString(R.string.manage_child_name_hint)
+            setText(existing?.name.orEmpty())
+        }
+        val ageInput = TextInputEditText(this).apply {
+            hint = getString(R.string.manage_child_age_hint)
+            inputType = InputType.TYPE_CLASS_NUMBER
+            setText(existing?.ageYears?.toString().orEmpty())
+        }
+        container.addView(nameInput)
+        container.addView(ageInput)
+
+        MaterialAlertDialogBuilder(this)
+            .setTitle(
+                if (existing == null) {
+                    getString(R.string.manage_children_add)
+                } else {
+                    getString(R.string.manage_child_edit_title)
+                }
+            )
+            .setView(container)
+            .setNegativeButton(android.R.string.cancel, null)
+            .setPositiveButton(R.string.evidence_label_save) { _, _ ->
+                val childName = nameInput.text?.toString().orEmpty().trim()
+                if (childName.isBlank()) return@setPositiveButton
+                lifecycleScope.launch {
+                    localMonitoringRepository.saveChildProfile(
+                        id = existing?.id,
+                        name = childName,
+                        ageYears = ageInput.text?.toString()?.trim()?.toIntOrNull()
+                    )
+                    manageViewModel.load(preferredName)
+                    activityFeedViewModel.loadFeed()
+                }
+            }
+            .show()
+    }
+
+    private fun confirmDeleteChildProfile(profile: ManagePersonProfileUi) {
+        MaterialAlertDialogBuilder(this)
+            .setTitle(getString(R.string.manage_child_delete_title, profile.name))
+            .setMessage(getString(R.string.manage_child_delete_body))
+            .setNegativeButton(android.R.string.cancel, null)
+            .setPositiveButton(R.string.manage_child_delete_confirm) { _, _ ->
+                lifecycleScope.launch {
+                    localMonitoringRepository.deletePersonProfile(profile.id)
+                    manageViewModel.load(preferredName)
+                    activityFeedViewModel.loadFeed()
+                }
+            }
+            .show()
+    }
+
+    private fun confirmDeleteEvidence() {
+        MaterialAlertDialogBuilder(this)
+            .setTitle(getString(R.string.evidence_delete_title))
+            .setMessage(getString(R.string.evidence_delete_body))
+            .setNegativeButton(android.R.string.cancel, null)
+            .setPositiveButton(R.string.evidence_delete_confirm) { _, _ ->
+                lifecycleScope.launch {
+                    runCatching { localMonitoringRepository.clearAllEvidence() }
+                        .onSuccess {
+                            Toast.makeText(
+                                this@MainActivity,
+                                getString(R.string.evidence_delete_done),
+                                Toast.LENGTH_SHORT
+                            ).show()
+                            activityFeedViewModel.loadFeed()
+                            manageViewModel.load(preferredName)
+                            scheduleDashboardRefresh()
+                        }
+                        .onFailure { throwable ->
+                            Toast.makeText(
+                                this@MainActivity,
+                                throwable.message ?: getString(R.string.dashboard_unavailable),
+                                Toast.LENGTH_LONG
+                            ).show()
+                        }
+                }
+            }
+            .show()
+    }
+
+    private fun confirmClearMonitoringHistory() {
+        MaterialAlertDialogBuilder(this)
+            .setTitle(getString(R.string.manage_clear_history_title))
+            .setMessage(getString(R.string.manage_clear_history_body))
+            .setNegativeButton(android.R.string.cancel, null)
+            .setPositiveButton(R.string.manage_clear_history_confirm) { _, _ ->
+                lifecycleScope.launch {
+                    runCatching { localMonitoringRepository.clearMonitoringHistory() }
+                        .onSuccess {
+                            Toast.makeText(
+                                this@MainActivity,
+                                getString(R.string.manage_clear_history_done),
+                                Toast.LENGTH_SHORT
+                            ).show()
+                            activityFeedViewModel.loadFeed()
+                            manageViewModel.load(preferredName)
+                            scheduleDashboardRefresh()
+                        }
+                        .onFailure { throwable ->
+                            Toast.makeText(
+                                this@MainActivity,
+                                throwable.message ?: getString(R.string.dashboard_unavailable),
+                                Toast.LENGTH_LONG
+                            ).show()
+                        }
+                }
+            }
+            .show()
+    }
+
+    private fun confirmUnlinkThisDevice() {
+        MaterialAlertDialogBuilder(this)
+            .setTitle(getString(R.string.manage_unlink_title))
+            .setMessage(getString(R.string.manage_unlink_body))
+            .setNegativeButton(android.R.string.cancel, null)
+            .setPositiveButton(R.string.manage_unlink_confirm) { _, _ ->
+                lifecycleScope.launch {
+                    unlinkAllFamilyDevices()
+                }
+            }
+            .show()
+    }
+
+    private suspend fun unlinkAllFamilyDevices() {
+        val localDeviceId = deviceInfoProvider.getDeviceInfo().deviceId
+        val linkedDevices = runCatching {
+            deviceLinkingService.fetchLinkedDevices(localDeviceId)
+        }.getOrElse { throwable ->
+            Toast.makeText(
+                this@MainActivity,
+                throwable.message ?: getString(R.string.dashboard_unavailable),
+                Toast.LENGTH_LONG
+            ).show()
             return
         }
-        FaceCaptureService.start(applicationContext)
-        refreshFaceCaptureStatus()
+        if (linkedDevices.isEmpty()) {
+            Toast.makeText(
+                this@MainActivity,
+                getString(R.string.manage_unlink_empty),
+                Toast.LENGTH_SHORT
+            ).show()
+            return
+        }
+        runCatching {
+            linkedDevices.forEach { linked ->
+                deviceLinkingService.unlinkDevicesBidirectional(localDeviceId, linked.remoteDeviceId)
+            }
+        }.onSuccess {
+            Toast.makeText(
+                this@MainActivity,
+                getString(R.string.manage_unlink_done),
+                Toast.LENGTH_SHORT
+            ).show()
+            refreshFamilyDashboardData()
+            manageViewModel.load(preferredName)
+        }.onFailure { throwable ->
+            Toast.makeText(
+                this@MainActivity,
+                throwable.message ?: getString(R.string.dashboard_unavailable),
+                Toast.LENGTH_LONG
+            ).show()
+        }
     }
 
     private fun updateUsageAccessState() {
         val granted = UsageAccessHelper.hasUsageAccess(this)
         if (!granted) {
-            dashboardStatusText.visibility = View.VISIBLE
-            dashboardStatusText.text = getString(R.string.dashboard_unavailable)
+            showDashboardStatus(getString(R.string.dashboard_unavailable))
         }
     }
 
@@ -399,8 +1477,11 @@ class MainActivity : AppCompatActivity() {
         lifecycleScope.launch {
             delay(4000L)
             dashboardViewModel.loadSummary(deviceId)
+            activityFeedViewModel.loadFeed()
+            manageViewModel.load(preferredName)
             refreshFamilyDashboardData()
             refreshInsightsCard()
+            refreshActivityFeedBanner()
         }
     }
 
@@ -424,9 +1505,10 @@ class MainActivity : AppCompatActivity() {
                 return@launch
             }
 
-            val rows = analyses.distinctBy { it.channel.lowercase() }
+            val distinctAnalyses = analyses.distinctBy { it.channel.lowercase() }
+            val rows = distinctAnalyses
                 .take(3)
-                .map { "${it.channel} - ${it.label.uppercase()}" }
+                .map { "${it.channel} - ${formatInsightLabel(it.label)}" }
             val rowViews = listOf(insightRow1, insightRow2, insightRow3)
             rowViews.forEachIndexed { index, rowView ->
                 val text = rows.getOrNull(index)
@@ -439,15 +1521,16 @@ class MainActivity : AppCompatActivity() {
             }
 
             insightsStatusText.visibility = View.VISIBLE
-            insightsStatusText.text = getString(R.string.dashboard_last_updated, formatTimestamp(System.currentTimeMillis()))
+            insightsStatusText.text = getString(R.string.dashboard_channels_reviewed, distinctAnalyses.size)
             insightsList.visibility = View.VISIBLE
             insightsEmptyState.visibility = View.GONE
         }
     }
 
     private fun setupBottomNavigation() {
-        bottomNav.selectedItemId = R.id.nav_dashboard
-        showTab(R.id.nav_dashboard)
+        val initialTab = intent.getIntExtra(EXTRA_OPEN_TAB, R.id.nav_dashboard)
+        bottomNav.selectedItemId = initialTab
+        showTab(initialTab)
         bottomNav.setOnItemSelectedListener { item ->
             showTab(item.itemId)
             true
@@ -457,9 +1540,24 @@ class MainActivity : AppCompatActivity() {
     private fun showTab(itemId: Int) {
         dashboardTabContent.visibility = if (itemId == R.id.nav_dashboard) View.VISIBLE else View.GONE
         activityTabContent.visibility = if (itemId == R.id.nav_activity) View.VISIBLE else View.GONE
+        manageTabContent.visibility = if (itemId == R.id.nav_manage) View.VISIBLE else View.GONE
+        if (itemId != lastTrackedTabId) {
+            analyticsTracker.logTabViewed(
+                when (itemId) {
+                    R.id.nav_activity -> "activity"
+                    R.id.nav_manage -> "manage"
+                    else -> "dashboard"
+                }
+            )
+            lastTrackedTabId = itemId
+        }
         if (itemId == R.id.nav_activity) {
-            refreshFaceCaptureStatus()
-            refreshVideosWatchedCard()
+            activityFeedViewModel.ensureLoaded()
+            refreshActivityFeedBanner()
+        }
+        if (itemId == R.id.nav_manage) {
+            manageViewModel.load(preferredName)
+            applyPendingManageSection()
         }
     }
 
@@ -477,19 +1575,16 @@ class MainActivity : AppCompatActivity() {
         dashboardFamilyContent.visibility = View.VISIBLE
     }
 
-    private fun renderKpiChips(state: DashboardUiState) {
-        val entries = parseTopApps(state.topAppsText)
+    private fun renderKpiChips(state: DashboardUiState, entries: List<TopAppEntry>) {
         val sessions = entries.size
-        val riskyApps = setOf("YouTube", "TikTok", "Instagram", "Snapchat", "Discord", "Facebook", "X", "Reddit")
-        val riskFlags = entries.count { it.name in riskyApps && it.minutes >= 30 }
+        val riskFlags = countRiskFlags(entries)
 
         chipScreenTime.text = getString(R.string.kpi_screen_time, state.totalUsageMinutes)
         chipSessions.text = getString(R.string.kpi_sessions, sessions)
         chipRiskFlags.text = getString(R.string.kpi_risk_flags, riskFlags)
     }
 
-    private fun renderTopAppsRows(rawTopApps: String) {
-        val entries = parseTopApps(rawTopApps)
+    private fun renderTopAppsRows(entries: List<TopAppEntry>) {
         topAppsSkeleton.visibility = View.GONE
 
         if (entries.isEmpty()) {
@@ -517,6 +1612,60 @@ class MainActivity : AppCompatActivity() {
         entries.forEach { previousTopAppMinutes[it.name] = it.minutes }
     }
 
+    private fun countRiskFlags(entries: List<TopAppEntry>): Int {
+        val riskyApps = setOf(
+            "YouTube",
+            "YouTube Kids",
+            "TikTok",
+            "Instagram",
+            "WhatsApp",
+            "Snapchat",
+            "Facebook",
+            "Messenger",
+            "Threads",
+            "Telegram",
+            "Discord",
+            "X",
+            "Reddit",
+            "Netflix",
+            "Prime Video",
+            "Disney+ Hotstar",
+            "JioCinema",
+            "MX Player"
+        )
+        return entries.count { it.name in riskyApps && it.minutes >= 30 }
+    }
+
+    private fun resolveDashboardGuidance(
+        state: DashboardUiState,
+        entries: List<TopAppEntry>
+    ): String {
+        if (!UsageAccessHelper.hasUsageAccess(this)) {
+            return getString(R.string.dashboard_guidance_permissions)
+        }
+        if (entries.isEmpty() || state.totalUsageMinutes == 0) {
+            return getString(R.string.dashboard_guidance_empty)
+        }
+        if (countRiskFlags(entries) > 0) {
+            return getString(R.string.dashboard_guidance_risk)
+        }
+
+        val topEntry = entries.maxByOrNull { it.minutes }
+        if (topEntry != null &&
+            state.totalUsageMinutes > 0 &&
+            topEntry.minutes * 100 >= state.totalUsageMinutes * 60
+        ) {
+            return getString(R.string.dashboard_guidance_top_app, topEntry.name)
+        }
+        if (state.totalUsageMinutes >= 120) {
+            return getString(R.string.dashboard_guidance_high_usage)
+        }
+        if (hasCameraPermission() && FaceCaptureState.lastFaceDetectedAt == 0L) {
+            return getString(R.string.dashboard_guidance_viewer)
+        }
+        return getString(R.string.dashboard_guidance_steady)
+    }
+
     private fun parseTopApps(rawTopApps: String): List<TopAppEntry> {
         if (rawTopApps.isBlank() || rawTopApps == "N/A") return emptyList()
         return rawTopApps.split(", ")
@@ -538,9 +1687,19 @@ class MainActivity : AppCompatActivity() {
         }
     }
 
+    private fun formatInsightLabel(label: String): String {
+        return label.split('_', '-', ' ')
+            .filter { it.isNotBlank() }
+            .joinToString(" ") { part ->
+                part.lowercase(Locale.getDefault()).replaceFirstChar { first ->
+                    if (first.isLowerCase()) first.titlecase(Locale.getDefault()) else first.toString()
+                }
+            }
+    }
+
     private fun applyTopAppIcon(iconView: ImageView, appName: String) {
         if (appName == "Misc apps") {
-            iconView.setImageResource(android.R.drawable.ic_menu_sort_by_size)
+            iconView.setImageResource(R.drawable.ic_placeholder_apps)
             return
         }
         val normalizedName = appName.trim().lowercase(Locale.getDefault())
@@ -557,7 +1716,7 @@ class MainActivity : AppCompatActivity() {
                 return
             }
         }
-        iconView.setImageResource(android.R.drawable.sym_def_app_icon)
+        iconView.setImageResource(R.drawable.ic_placeholder_apps)
     }
 
     private fun buildInstalledLabelIndex() {
@@ -579,7 +1738,7 @@ class MainActivity : AppCompatActivity() {
         TextView(this).apply {
             this.text = text
             setTextAppearance(com.google.android.material.R.style.TextAppearance_Material3_BodyMedium)
-            setTextColor(currentTextColor)
+            setTextColor(ContextCompat.getColor(this@MainActivity, R.color.kw_on_surface))
         }
 
     private suspend fun ensureLocalDeviceProfile() {
@@ -642,9 +1801,7 @@ class MainActivity : AppCompatActivity() {
     ): MaterialCardView {
         val maxMinutes = (summaries.maxOfOrNull { it.totalMinutes } ?: 0).coerceAtLeast(1)
         val card = MaterialCardView(this).apply {
-            radius = 18f
-            cardElevation = 0f
-            strokeWidth = 1
+            styleSurfaceCard(this)
             setContentPadding(dp(16), dp(16), dp(16), dp(16))
         }
         val column = LinearLayout(this).apply {
@@ -711,6 +1868,9 @@ class MainActivity : AppCompatActivity() {
             max = 100
             progress = ((minutes * 100f) / maxMinutes).toInt().coerceIn(0, 100)
             trackCornerRadius = dp(6)
+            trackThickness = dp(10)
+            setIndicatorColor(ContextCompat.getColor(this@MainActivity, R.color.kw_primary))
+            trackColor = ContextCompat.getColor(this@MainActivity, R.color.kw_surface_variant)
         }
         row.addView(header)
         row.addView(progress)
@@ -722,10 +1882,8 @@ class MainActivity : AppCompatActivity() {
         maxFamilyMinutes: Int
     ): MaterialCardView {
         val card = MaterialCardView(this).apply {
-            radius = 18f
-            cardElevation = 0f
-            setContentPadding(24, 24, 24, 24)
-            strokeWidth = 1
+            styleSurfaceCard(this, altBackground = true)
+            setContentPadding(dp(20), dp(20), dp(20), dp(20))
         }
         val column = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
@@ -757,7 +1915,7 @@ class MainActivity : AppCompatActivity() {
             }
         )
         column.addView(
-            createInfoRow("Top apps: ${summary.topAppsText}").apply {
+            createInfoRow(getString(R.string.dashboard_top_apps, summary.topAppsText)).apply {
                 val params = LinearLayout.LayoutParams(
                     LinearLayout.LayoutParams.MATCH_PARENT,
                     LinearLayout.LayoutParams.WRAP_CONTENT
@@ -795,6 +1953,7 @@ class MainActivity : AppCompatActivity() {
             }.onSuccess {
                 Toast.makeText(this@MainActivity, getString(R.string.profile_status_link_removed), Toast.LENGTH_SHORT).show()
                 refreshFamilyDashboardData()
+                manageViewModel.load(preferredName)
             }.onFailure { throwable ->
                 Toast.makeText(this@MainActivity, throwable.message ?: getString(R.string.dashboard_unavailable), Toast.LENGTH_LONG).show()
             }
@@ -803,10 +1962,10 @@ class MainActivity : AppCompatActivity() {
 
     private fun showMyDeviceQr() {
         if (preferredName.isBlank()) {
-            promptForPreferredNameIfNeeded(force = true)
+            startActivity(Intent(this, OnboardingActivity::class.java))
             return
         }
-        dashboardStatusText.text = getString(R.string.profile_status_qr_generating)
+        showDashboardStatus(getString(R.string.profile_status_qr_generating))
         lifecycleScope.launch { ensureLocalDeviceProfile() }
         val info = deviceInfoProvider.getDeviceInfo()
         val resolvedIdentity = resolveLocalIdentity()
@@ -823,11 +1982,11 @@ class MainActivity : AppCompatActivity() {
             createQrBitmap(payload, 680)
         }.getOrElse {
             Log.e("KidWatchLinking", "showMyDeviceQr failed", it)
-            dashboardStatusText.text = it.message ?: getString(R.string.profile_qr_invalid)
+            showDashboardStatus(it.message ?: getString(R.string.profile_qr_invalid))
             Toast.makeText(this, getString(R.string.profile_qr_invalid), Toast.LENGTH_SHORT).show()
             return
         }
-        dashboardStatusText.text = getString(R.string.profile_status_qr_ready)
+        showDashboardStatus(getString(R.string.profile_status_qr_ready))
         showQrDialog(bitmap)
     }
 
@@ -889,12 +2048,37 @@ class MainActivity : AppCompatActivity() {
                 )
             }.onSuccess {
                 Toast.makeText(this@MainActivity, getString(R.string.profile_qr_link_success), Toast.LENGTH_SHORT).show()
-                dashboardStatusText.text = getString(R.string.profile_qr_link_success)
+                showDashboardStatus(getString(R.string.profile_qr_link_success))
                 refreshFamilyDashboardData()
+                manageViewModel.load(preferredName)
             }.onFailure { throwable ->
                 Toast.makeText(this@MainActivity, throwable.message ?: getString(R.string.profile_qr_link_failed), Toast.LENGTH_LONG).show()
-                dashboardStatusText.text = throwable.message ?: getString(R.string.profile_qr_link_failed)
+                showDashboardStatus(throwable.message ?: getString(R.string.profile_qr_link_failed))
             }
+        }
+    }
+
+    private fun openManageSection(section: String? = null) {
+        pendingManageSection = section
+        if (bottomNav.selectedItemId == R.id.nav_manage) {
+            showTab(R.id.nav_manage)
+        } else {
+            bottomNav.selectedItemId = R.id.nav_manage
+        }
+    }
+
+    private fun applyPendingManageSection() {
+        val section = pendingManageSection ?: return
+        val target = when (section) {
+            MANAGE_SECTION_THIS_DEVICE -> manageSectionThisDevice
+            MANAGE_SECTION_MONITORING_APPS -> manageSectionMonitoringApps
+            MANAGE_SECTION_UNKNOWN_VIEWERS -> manageSectionUnknownViewers
+            MANAGE_SECTION_PERMISSIONS -> manageSectionPermissions
+            else -> null
+        } ?: return
+        manageTabContent.post {
+            manageTabContent.smoothScrollTo(0, (target.top - dp(12)).coerceAtLeast(0))
+            pendingManageSection = null
         }
     }
 
@@ -914,39 +2098,6 @@ class MainActivity : AppCompatActivity() {
         return bitmap
     }
 
-    private fun promptForPreferredNameIfNeeded(force: Boolean = false) {
-        if (isNamePromptVisible) return
-        if (!force && preferredName.isNotBlank()) {
-            updateDashboardGreeting()
-            return
-        }
-        isNamePromptVisible = true
-        val nameInput = TextInputEditText(this).apply {
-            hint = getString(R.string.profile_onboarding_name_hint)
-            setText(preferredName)
-        }
-        MaterialAlertDialogBuilder(this)
-            .setTitle(getString(R.string.profile_onboarding_name_title))
-            .setCancelable(false)
-            .setView(nameInput)
-            .setPositiveButton(android.R.string.ok) { _, _ ->
-                val entered = nameInput.text?.toString().orEmpty().trim()
-                if (entered.isBlank()) {
-                    dashboardStatusText.text = getString(R.string.profile_onboarding_name_required)
-                    isNamePromptVisible = false
-                    promptForPreferredNameIfNeeded(force = true)
-                    return@setPositiveButton
-                }
-                preferredName = entered
-                profilePrefs.edit().putString(PREF_PREFERRED_NAME, preferredName).apply()
-                dashboardStatusText.text = getString(R.string.profile_name_saved, preferredName)
-                updateDashboardGreeting()
-                refreshFamilyDashboardData()
-                isNamePromptVisible = false
-            }
-            .show()
-    }
-
     private fun updateDashboardGreeting() {
         val name = preferredName.ifBlank { "there" }
         titleText.text = getString(R.string.dashboard_greeting_hi, name)
@@ -963,9 +2114,42 @@ class MainActivity : AppCompatActivity() {
         startActivity(intent)
     }
 
+    private fun openActivityFeed(filter: ActivityFeedFilter = ActivityFeedFilter.ALL) {
+        bottomNav.selectedItemId = R.id.nav_activity
+        activityTabContent.scrollToPosition(0)
+        activityFeedViewModel.setFilter(filter)
+        refreshActivityFeedBanner()
+    }
+
+    private fun openSessionDetail(sessionId: Long) {
+        startActivity(
+            Intent(this, SessionDetailActivity::class.java).apply {
+                putExtra(SessionDetailActivity.EXTRA_SESSION_ID, sessionId)
+            }
+        )
+    }
+
     private fun formatTimestamp(timestampMillis: Long): String {
         val formatter = SimpleDateFormat("hh:mm a", Locale.getDefault())
         return formatter.format(Date(timestampMillis))
+    }
+
+    private fun showDashboardStatus(message: String) {
+        dashboardStatusText.visibility = View.VISIBLE
+        dashboardStatusText.text = message
+    }
+
+    private fun styleSurfaceCard(card: MaterialCardView, altBackground: Boolean = false) {
+        card.radius = dp(28).toFloat()
+        card.cardElevation = 0f
+        card.strokeWidth = dp(1)
+        card.strokeColor = ContextCompat.getColor(this, R.color.kw_outline_variant)
+        card.setCardBackgroundColor(
+            ContextCompat.getColor(
+                this,
+                if (altBackground) R.color.kw_card_surface_alt else R.color.kw_card_surface
+            )
+        )
     }
 
     private data class QrDevicePayload(
@@ -976,8 +2160,28 @@ class MainActivity : AppCompatActivity() {
         val preferredName: String
     )
 
-    private companion object {
-        private const val PREF_PREFERRED_NAME = "preferred_name"
+    companion object {
+        private const val EXTRA_OPEN_TAB = "open_tab"
+        private const val EXTRA_OPEN_SECTION = "open_section"
+        private const val MANAGE_SECTION_THIS_DEVICE = "this_device"
+        private const val MANAGE_SECTION_MONITORING_APPS = "monitoring_apps"
+        private const val MANAGE_SECTION_UNKNOWN_VIEWERS = "unknown_viewers"
+        private const val MANAGE_SECTION_PERMISSIONS = "permissions"
+        private const val FEED_LOAD_MORE_THRESHOLD = 5
+
+        fun createIntentForTab(
+            context: Context,
+            tabId: Int,
+            openSection: String? = null
+        ): Intent {
+            return Intent(context, MainActivity::class.java).apply {
+                putExtra(EXTRA_OPEN_TAB, tabId)
+                if (!openSection.isNullOrBlank()) {
+                    putExtra(EXTRA_OPEN_SECTION, openSection)
+                }
+                addFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP or Intent.FLAG_ACTIVITY_SINGLE_TOP)
+            }
+        }
     }
 }
 

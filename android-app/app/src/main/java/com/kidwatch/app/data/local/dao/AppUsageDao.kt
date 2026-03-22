@@ -25,4 +25,7 @@ interface AppUsageDao {
 
     @Query("DELETE FROM AppUsage WHERE endTime < :cutoffMs")
     suspend fun deleteOlderThan(cutoffMs: Long): Int
+
+    @Query("DELETE FROM AppUsage")
+    suspend fun deleteAll()
 }

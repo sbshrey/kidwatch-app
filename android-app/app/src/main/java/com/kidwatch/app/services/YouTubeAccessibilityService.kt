@@ -14,62 +14,79 @@ import kotlinx.coroutines.launch
 class YouTubeAccessibilityService : AccessibilityService() {
 
     private val serviceScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
-    private var lastEventAtMs: Long = 0L
-    private var lastSignature: String = ""
+    private val lastCaptureByPackage = mutableMapOf<String, RecentCapture>()
+    private val repository by lazy { LocalMonitoringRepository(applicationContext) }
 
     override fun onAccessibilityEvent(event: AccessibilityEvent?) {
         if (event == null) return
-        if (event.packageName?.toString() != YOUTUBE_PACKAGE) return
+        val packageName = event.packageName?.toString() ?: return
+        if (!AccessibilityCaptureCatalog.isSupportedPackage(packageName)) return
         if (!TRACKED_EVENT_TYPES.contains(event.eventType)) return
 
-        var textParts = event.text.mapNotNull { it?.toString()?.trim() }.filter { it.isNotBlank() }
-        if (textParts.isEmpty()) {
-            textParts = extractTextFromWindow()
-        }
-        if (textParts.isEmpty()) return
-
-        val title = textParts.firstOrNull().orEmpty()
-        val channel = textParts.drop(1).firstOrNull().orEmpty()
-        if (title.length < 3) return
+        val eventTextParts = event.text.mapNotNull { it?.toString()?.trim() }.filter { it.isNotBlank() }
+        val windowTextParts = extractTextFromWindow()
+        val capturedContent = AccessibilityCaptureCatalog.parse(
+            packageName = packageName,
+            eventTextParts = eventTextParts,
+            windowTextParts = windowTextParts
+        ) ?: return
 
         val now = System.currentTimeMillis()
-        val signature = "${title.lowercase()}|${channel.lowercase()}"
-        if (signature == lastSignature && now - lastEventAtMs < EVENT_THROTTLE_MS) return
-        if (now - lastEventAtMs < EVENT_THROTTLE_MS / 2) return
-        lastSignature = signature
-        lastEventAtMs = now
+        val signatureBase = buildString {
+            append(packageName)
+            append('|')
+            append(capturedContent.title.lowercase())
+            append('|')
+            append(capturedContent.channel.lowercase())
+        }
+        val linkScore = capturedContent.linkScore()
+        val previousCapture = lastCaptureByPackage[packageName]
+        if (
+            previousCapture != null &&
+            previousCapture.signatureBase == signatureBase &&
+            now - previousCapture.timestamp < EVENT_THROTTLE_MS &&
+            linkScore <= previousCapture.linkScore
+        ) {
+            return
+        }
+        if (
+            previousCapture != null &&
+            now - previousCapture.timestamp < EVENT_THROTTLE_MS / 2 &&
+            linkScore <= previousCapture.linkScore
+        ) {
+            return
+        }
+        lastCaptureByPackage[packageName] = RecentCapture(
+            signatureBase = signatureBase,
+            linkScore = linkScore,
+            timestamp = now
+        )
 
-        startFaceCaptureServiceIfNeeded()
-
-        val repository = LocalMonitoringRepository(applicationContext)
-        val faceDetected = FaceCaptureState.wasFaceSeenRecently()
         serviceScope.launch {
-            repository.saveVideoEvent(
-                title = title,
-                channel = channel,
+            val capturePolicy = repository.getCapturePolicy(packageName)
+            if (!capturePolicy.trackSessions) return@launch
+
+            val faceDetected = FaceCaptureState.wasFaceSeenRecently()
+            val resolvedSessionId = repository.saveVideoEvent(
+                packageName = packageName,
+                title = capturedContent.title,
+                channel = capturedContent.channel,
                 timestamp = now,
-                faceDetected = faceDetected
-            )
+                canonicalUrl = capturedContent.canonicalUrl,
+                faceDetected = faceDetected,
+                sessionId = EvidenceRuntimeState.currentSessionId
+            ) ?: EvidenceRuntimeState.currentSessionId
+            resolvedSessionId?.let(EvidenceRuntimeState::requestScreenshot)
         }
     }
 
     override fun onInterrupt() = Unit
 
-    private fun startFaceCaptureServiceIfNeeded() {
-        try {
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-                startForegroundService(Intent(this, FaceCaptureService::class.java))
-            } else {
-                startService(Intent(this, FaceCaptureService::class.java))
-            }
-        } catch (_: Exception) {}
-    }
-
     private fun extractTextFromWindow(): List<String> {
         val root = rootInActiveWindow ?: return emptyList()
         val texts = mutableSetOf<String>()
         collectTextRecursive(root, texts)
-        return texts.filter { it.length >= 3 }.distinct().take(5)
+        return texts.filter { it.length >= 3 }.distinct().take(12)
     }
 
     private fun collectTextRecursive(node: AccessibilityNodeInfo?, out: MutableSet<String>) {
@@ -86,12 +103,25 @@ class YouTubeAccessibilityService : AccessibilityService() {
     }
 
     private companion object {
-        private const val YOUTUBE_PACKAGE = "com.google.android.youtube"
         private const val EVENT_THROTTLE_MS = 15_000L
         private val TRACKED_EVENT_TYPES = setOf(
             AccessibilityEvent.TYPE_WINDOW_STATE_CHANGED,
             AccessibilityEvent.TYPE_WINDOW_CONTENT_CHANGED,
-            AccessibilityEvent.TYPE_VIEW_SCROLLED
+            AccessibilityEvent.TYPE_VIEW_SCROLLED,
+            AccessibilityEvent.TYPE_VIEW_TEXT_CHANGED
         )
+    }
+
+    private data class RecentCapture(
+        val signatureBase: String,
+        val linkScore: Int,
+        val timestamp: Long
+    )
+
+    private fun AccessibilityCaptureCatalog.CapturedContent.linkScore(): Int {
+        return when (linkKind) {
+            "exact" -> 1
+            else -> 0
+        }
     }
 }

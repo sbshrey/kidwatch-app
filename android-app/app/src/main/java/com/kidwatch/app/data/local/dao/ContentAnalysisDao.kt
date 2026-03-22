@@ -13,4 +13,13 @@ interface ContentAnalysisDao {
 
     @Query("SELECT * FROM ContentAnalysis WHERE dateKey = :dateKey ORDER BY createdAt DESC")
     suspend fun getForDate(dateKey: String): List<ContentAnalysisEntity>
+
+    @Query("SELECT * FROM ContentAnalysis WHERE dateKey = :dateKey AND deviceId = :deviceId ORDER BY createdAt DESC")
+    suspend fun getForDateAndDevice(dateKey: String, deviceId: String): List<ContentAnalysisEntity>
+
+    @Query("DELETE FROM ContentAnalysis WHERE dateKey = :dateKey AND deviceId = :deviceId")
+    suspend fun deleteForDateAndDevice(dateKey: String, deviceId: String)
+
+    @Query("DELETE FROM ContentAnalysis")
+    suspend fun deleteAll()
 }

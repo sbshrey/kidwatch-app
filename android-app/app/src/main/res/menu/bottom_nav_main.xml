@@ -2,10 +2,14 @@
 <menu xmlns:android="http://schemas.android.com/apk/res/android">
     <item
         android:id="@+id/nav_dashboard"
-        android:icon="@android:drawable/ic_menu_view"
+        android:icon="@drawable/ic_nav_dashboard"
         android:title="@string/nav_dashboard" />
     <item
         android:id="@+id/nav_activity"
-        android:icon="@android:drawable/ic_menu_info_details"
+        android:icon="@drawable/ic_nav_activity"
         android:title="@string/nav_activity" />
+    <item
+        android:id="@+id/nav_manage"
+        android:icon="@drawable/ic_nav_manage"
+        android:title="@string/nav_manage" />
 </menu>

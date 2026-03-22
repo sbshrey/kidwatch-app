@@ -4,17 +4,19 @@
     xmlns:tools="http://schemas.android.com/tools"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
-    android:background="?attr/colorSurface">
+    android:background="@drawable/bg_app_canvas">
 
     <androidx.core.widget.NestedScrollView
         android:id="@+id/dashboardTabContent"
         android:layout_width="0dp"
         android:layout_height="0dp"
         android:clipToPadding="false"
+        android:fillViewport="true"
+        android:overScrollMode="never"
         android:paddingStart="20dp"
-        android:paddingTop="16dp"
+        android:paddingTop="14dp"
         android:paddingEnd="20dp"
-        android:paddingBottom="24dp"
+        android:paddingBottom="18dp"
         app:layout_constraintBottom_toTopOf="@id/bottomNav"
         app:layout_constraintEnd_toEndOf="parent"
         app:layout_constraintStart_toStartOf="parent"
@@ -25,80 +27,172 @@
             android:layout_height="wrap_content"
             android:orientation="vertical">
 
-            <!-- Header: line 1 = greeting + My/Family toggle, line 2 = Show QR + Scan QR -->
-            <LinearLayout
+            <FrameLayout
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:layout_marginTop="12dp"
-                android:orientation="vertical">
+                android:background="@drawable/bg_hero_gradient"
+                android:padding="18dp">
+
+                <View
+                    android:layout_width="132dp"
+                    android:layout_height="132dp"
+                    android:layout_gravity="top|end"
+                    android:alpha="0.28"
+                    android:background="@drawable/bg_accent_circle"
+                    android:translationX="36dp"
+                    android:translationY="-22dp" />
+
+                <View
+                    android:layout_width="64dp"
+                    android:layout_height="64dp"
+                    android:layout_gravity="bottom|start"
+                    android:alpha="0.14"
+                    android:background="@drawable/bg_accent_circle"
+                    android:translationX="-10dp"
+                    android:translationY="8dp" />
 
                 <LinearLayout
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
-                    android:orientation="horizontal"
-                    android:gravity="center_vertical">
+                    android:orientation="vertical">
+
+                    <TextView
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:background="@drawable/bg_pill_dark"
+                        android:paddingStart="12dp"
+                        android:paddingTop="7dp"
+                        android:paddingEnd="12dp"
+                        android:paddingBottom="7dp"
+                        android:text="@string/dashboard_hero_badge"
+                        android:textAppearance="@style/TextAppearance.Material3.LabelMedium"
+                        android:textColor="@android:color/white" />
 
                     <TextView
                         android:id="@+id/tvTitle"
-                        android:layout_width="0dp"
+                        android:layout_width="match_parent"
                         android:layout_height="wrap_content"
-                        android:layout_weight="1"
-                        android:ellipsize="end"
-                        android:maxLines="1"
+                        android:layout_marginTop="12dp"
                         android:text="@string/app_name"
-                        android:textAppearance="@style/TextAppearance.Material3.HeadlineMedium"
-                        android:textColor="?attr/colorOnSurface" />
+                        android:textAppearance="@style/TextAppearance.Material3.HeadlineLarge"
+                        android:textColor="@android:color/white"
+                        tools:text="Hi Aarav" />
 
-                    <com.google.android.material.chip.ChipGroup
-                        android:id="@+id/chipGroupDashboardToggle"
+                    <TextView
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="6dp"
+                        android:text="@string/dashboard_header_subtitle"
+                        android:textAppearance="@style/TextAppearance.Material3.BodyMedium"
+                        android:textColor="#E6FFFFFF" />
+
+                    <TextView
+                        android:id="@+id/tvDashboardStatus"
                         android:layout_width="wrap_content"
                         android:layout_height="wrap_content"
-                        app:singleSelection="true">
+                        android:layout_marginTop="12dp"
+                        android:background="@drawable/bg_pill_dark"
+                        android:paddingStart="12dp"
+                        android:paddingTop="7dp"
+                        android:paddingEnd="12dp"
+                        android:paddingBottom="7dp"
+                        android:text="@string/dashboard_loading"
+                        android:textAppearance="@style/TextAppearance.Material3.LabelMedium"
+                        android:textColor="@android:color/white"
+                        tools:text="Device linked successfully via QR." />
 
-                        <com.google.android.material.chip.Chip
-                            android:id="@+id/chipMy"
-                            style="@style/Widget.Material3.Chip.Filter"
+                    <com.google.android.material.button.MaterialButton
+                        android:id="@+id/btnDashboardEvidenceCapture"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="12dp"
+                        android:minHeight="48dp"
+                        android:text="@string/evidence_projection_button_enable_auto"
+                        app:icon="@drawable/ic_viewer_check"
+                        app:iconPadding="8dp"
+                        app:iconTint="@android:color/white" />
+
+                    <LinearLayout
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="12dp"
+                        android:gravity="center_vertical"
+                        android:orientation="horizontal">
+
+                        <com.google.android.material.chip.ChipGroup
+                            android:id="@+id/chipGroupDashboardToggle"
+                            android:layout_width="0dp"
+                            android:layout_height="wrap_content"
+                            android:layout_weight="1"
+                            app:singleSelection="true">
+
+                            <com.google.android.material.chip.Chip
+                                android:id="@+id/chipMy"
+                                style="@style/Widget.Material3.Chip.Filter"
+                                android:layout_width="wrap_content"
+                                android:layout_height="wrap_content"
+                                android:checked="true"
+                                android:text="@string/dashboard_toggle_my"
+                                app:chipBackgroundColor="@color/kw_card_surface"
+                                app:chipStrokeWidth="0dp"
+                                app:checkedIconVisible="false" />
+
+                            <com.google.android.material.chip.Chip
+                                android:id="@+id/chipFamily"
+                                style="@style/Widget.Material3.Chip.Filter"
+                                android:layout_width="wrap_content"
+                                android:layout_height="wrap_content"
+                                android:text="@string/dashboard_toggle_family"
+                                app:chipBackgroundColor="@color/kw_card_surface"
+                                app:chipStrokeWidth="0dp"
+                                app:checkedIconVisible="false" />
+                        </com.google.android.material.chip.ChipGroup>
+
+                        <com.google.android.material.button.MaterialButton
+                            android:id="@+id/btnDashboardManageFamily"
+                            style="@style/Widget.Material3.Button.TonalButton"
                             android:layout_width="wrap_content"
                             android:layout_height="wrap_content"
-                            android:checked="true"
-                            android:text="@string/dashboard_toggle_my" />
+                            android:minHeight="44dp"
+                            android:text="@string/dashboard_manage_family_button"
+                            app:icon="@drawable/ic_nav_manage"
+                            app:iconPadding="8dp"
+                            app:iconTint="@color/kw_on_primary_container" />
+                    </LinearLayout>
 
-                        <com.google.android.material.chip.Chip
-                            android:id="@+id/chipFamily"
-                            style="@style/Widget.Material3.Chip.Filter"
-                            android:layout_width="wrap_content"
+                    <LinearLayout
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="12dp"
+                        android:orientation="horizontal">
+
+                        <com.google.android.material.button.MaterialButton
+                            android:id="@+id/btnRunMonitoringNow"
+                            android:layout_width="0dp"
                             android:layout_height="wrap_content"
-                            android:text="@string/dashboard_toggle_family" />
-                    </com.google.android.material.chip.ChipGroup>
+                            android:layout_weight="1"
+                            android:minHeight="48dp"
+                            android:text="@string/run_monitoring_now"
+                            app:icon="@drawable/ic_refresh"
+                            app:iconPadding="8dp"
+                            app:iconTint="@android:color/white" />
+
+                        <com.google.android.material.button.MaterialButton
+                            android:id="@+id/btnRunSyncNow"
+                            style="@style/Widget.Material3.Button.TonalButton"
+                            android:layout_width="0dp"
+                            android:layout_height="wrap_content"
+                            android:layout_marginStart="10dp"
+                            android:layout_weight="1"
+                            android:minHeight="48dp"
+                            android:text="@string/run_sync_now"
+                            app:icon="@drawable/ic_sync"
+                            app:iconPadding="8dp"
+                            app:iconTint="@color/kw_on_primary_container" />
+                    </LinearLayout>
                 </LinearLayout>
+            </FrameLayout>
 
-                <LinearLayout
-                    android:layout_width="match_parent"
-                    android:layout_height="wrap_content"
-                    android:layout_marginTop="8dp"
-                    android:orientation="horizontal"
-                    android:gravity="start">
-
-                    <ImageButton
-                        android:id="@+id/btnDashboardShowQr"
-                        style="@style/Widget.Material3.Button.IconButton"
-                        android:layout_width="40dp"
-                        android:layout_height="40dp"
-                        android:contentDescription="@string/profile_show_device_qr"
-                        android:src="@android:drawable/ic_menu_share" />
-
-                    <ImageButton
-                        android:id="@+id/btnDashboardScanQr"
-                        style="@style/Widget.Material3.Button.IconButton"
-                        android:layout_width="40dp"
-                        android:layout_height="40dp"
-                        android:layout_marginStart="4dp"
-                        android:contentDescription="@string/profile_scan_device_qr"
-                        android:src="@android:drawable/ic_menu_camera" />
-                </LinearLayout>
-            </LinearLayout>
-
-            <!-- My dashboard content -->
             <LinearLayout
                 android:id="@+id/dashboardMyContent"
                 android:layout_width="match_parent"
@@ -108,350 +202,647 @@
 
                 <com.google.android.material.card.MaterialCardView
                     android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:layout_marginTop="12dp"
-                app:cardBackgroundColor="?attr/colorSurfaceContainerLow"
-                app:cardCornerRadius="18dp"
-                app:cardElevation="0dp"
-                app:strokeColor="?attr/colorOutlineVariant"
-                app:strokeWidth="1dp">
-
-                <LinearLayout
-                    android:layout_width="match_parent"
-                    android:layout_height="wrap_content"
-                    android:orientation="vertical"
-                    android:padding="16dp">
-
-                    <TextView
-                        android:layout_width="wrap_content"
-                        android:layout_height="wrap_content"
-                        android:text="@string/section_today_overview"
-                        android:textAppearance="@style/TextAppearance.Material3.TitleMedium" />
-
-                    <LinearLayout
-                        android:layout_width="match_parent"
-                        android:layout_height="wrap_content"
-                        android:layout_marginTop="10dp"
-                        android:orientation="horizontal">
-
-                        <com.google.android.material.chip.Chip
-                            android:id="@+id/chipScreenTime"
-                            style="@style/Widget.Material3.Chip.Assist"
-                            android:layout_width="wrap_content"
-                            android:layout_height="wrap_content"
-                            android:clickable="false"
-                            android:text="@string/kpi_screen_time_placeholder"
-                            app:chipIcon="@android:drawable/ic_menu_recent_history"
-                            app:chipIconVisible="true" />
-
-                        <com.google.android.material.chip.Chip
-                            android:id="@+id/chipSessions"
-                            style="@style/Widget.Material3.Chip.Assist"
-                            android:layout_width="wrap_content"
-                            android:layout_height="wrap_content"
-                            android:layout_marginStart="8dp"
-                            android:clickable="false"
-                            android:text="@string/kpi_sessions_placeholder"
-                            app:chipIcon="@android:drawable/ic_menu_agenda"
-                            app:chipIconVisible="true" />
-
-                        <com.google.android.material.chip.Chip
-                            android:id="@+id/chipRiskFlags"
-                            style="@style/Widget.Material3.Chip.Assist"
-                            android:layout_width="wrap_content"
-                            android:layout_height="wrap_content"
-                            android:layout_marginStart="8dp"
-                            android:clickable="false"
-                            android:text="@string/kpi_risk_flags_placeholder"
-                            app:chipIcon="@android:drawable/ic_dialog_alert"
-                            app:chipIconVisible="true" />
-                    </LinearLayout>
-
-                    <TextView
-                        android:id="@+id/tvDashboardStatus"
-                        android:layout_width="match_parent"
-                        android:layout_height="wrap_content"
-                        android:layout_marginTop="8dp"
-                        android:text="@string/dashboard_loading"
-                        android:textAppearance="@style/TextAppearance.Material3.BodyMedium"
-                        android:textColor="?attr/colorPrimary" />
-
-                    <TextView
-                        android:id="@+id/tvTodayUsage"
-                        android:layout_width="match_parent"
-                        android:layout_height="wrap_content"
-                        android:layout_marginTop="10dp"
-                        android:text="@string/dashboard_today_usage_label"
-                        android:textAppearance="@style/TextAppearance.Material3.HeadlineSmall"
-                        tools:text="Today total usage: 45 min" />
-
-                    <TextView
-                        android:id="@+id/tvLastUpdated"
-                        android:layout_width="match_parent"
-                        android:layout_height="wrap_content"
-                        android:layout_marginTop="6dp"
-                        android:text="@string/dashboard_last_updated_label"
-                        android:textAppearance="@style/TextAppearance.Material3.BodySmall"
-                        android:textColor="?attr/colorOnSurfaceVariant"
-                        tools:text="Last updated: 11:52 AM" />
-                </LinearLayout>
-            </com.google.android.material.card.MaterialCardView>
-
-                <com.google.android.material.card.MaterialCardView
-                    android:id="@+id/topAppsCard"
-                    android:layout_width="match_parent"
                     android:layout_height="wrap_content"
                     android:layout_marginTop="12dp"
-                    app:cardBackgroundColor="?attr/colorSurfaceContainerLow"
-                    app:cardCornerRadius="18dp"
+                    app:cardBackgroundColor="@color/kw_card_surface_alt"
+                    app:cardCornerRadius="28dp"
                     app:cardElevation="0dp"
-                    app:strokeColor="?attr/colorOutlineVariant"
+                    app:strokeColor="@color/kw_outline_variant"
                     app:strokeWidth="1dp">
 
                     <LinearLayout
                         android:layout_width="match_parent"
                         android:layout_height="wrap_content"
                         android:orientation="vertical"
-                        android:padding="16dp">
+                        android:padding="18dp">
+
+                        <TextView
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:background="@drawable/bg_pill_soft"
+                            android:paddingStart="10dp"
+                            android:paddingTop="7dp"
+                            android:paddingEnd="10dp"
+                            android:paddingBottom="7dp"
+                            android:text="@string/dashboard_overview_caption"
+                            android:textAppearance="@style/TextAppearance.Material3.LabelLarge"
+                            android:textColor="@color/kw_on_primary_container" />
+
+                        <TextView
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:layout_marginTop="12dp"
+                            android:text="@string/section_today_overview"
+                            android:textAppearance="@style/TextAppearance.Material3.TitleLarge"
+                            android:textColor="@color/kw_on_surface" />
+
+                        <TextView
+                            android:id="@+id/tvTodayUsage"
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            android:layout_marginTop="8dp"
+                            android:text="@string/dashboard_today_usage_label"
+                            android:textAppearance="@style/TextAppearance.Material3.HeadlineLarge"
+                            android:textColor="@color/kw_on_surface"
+                            tools:text="Today total usage: 45 min" />
+
+                        <TextView
+                            android:id="@+id/tvLastUpdated"
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            android:layout_marginTop="6dp"
+                            android:text="@string/dashboard_last_updated_label"
+                            android:textAppearance="@style/TextAppearance.Material3.BodyMedium"
+                            android:textColor="@color/kw_on_surface_variant"
+                            tools:text="Last updated: 11:52 AM" />
+
+                        <HorizontalScrollView
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            android:layout_marginTop="12dp"
+                            android:scrollbars="none">
+
+                            <LinearLayout
+                                android:layout_width="wrap_content"
+                                android:layout_height="wrap_content"
+                                android:orientation="horizontal">
+
+                                <com.google.android.material.chip.Chip
+                                    android:id="@+id/chipScreenTime"
+                                    style="@style/Widget.Material3.Chip.Assist"
+                                    android:layout_width="wrap_content"
+                                    android:layout_height="wrap_content"
+                                    android:clickable="false"
+                                    android:text="@string/kpi_screen_time_placeholder"
+                                    app:chipBackgroundColor="@color/kw_card_surface"
+                                    app:chipIcon="@drawable/ic_metric_clock"
+                                    app:chipIconTint="@color/kw_on_surface_variant"
+                                    app:chipIconVisible="true" />
+
+                                <com.google.android.material.chip.Chip
+                                    android:id="@+id/chipSessions"
+                                    style="@style/Widget.Material3.Chip.Assist"
+                                    android:layout_width="wrap_content"
+                                    android:layout_height="wrap_content"
+                                    android:layout_marginStart="8dp"
+                                    android:clickable="false"
+                                    android:text="@string/kpi_sessions_placeholder"
+                                    app:chipBackgroundColor="@color/kw_card_surface"
+                                    app:chipIcon="@drawable/ic_metric_sessions"
+                                    app:chipIconTint="@color/kw_on_surface_variant"
+                                    app:chipIconVisible="true" />
+
+                                <com.google.android.material.chip.Chip
+                                    android:id="@+id/chipRiskFlags"
+                                    style="@style/Widget.Material3.Chip.Assist"
+                                    android:layout_width="wrap_content"
+                                    android:layout_height="wrap_content"
+                                    android:layout_marginStart="8dp"
+                                    android:clickable="false"
+                                    android:text="@string/kpi_risk_flags_placeholder"
+                                    app:chipBackgroundColor="@color/kw_accent_orange_soft"
+                                    app:chipIcon="@drawable/ic_metric_risk"
+                                    app:chipIconTint="@color/kw_secondary"
+                                    app:chipIconVisible="true" />
+                            </LinearLayout>
+                        </HorizontalScrollView>
+                    </LinearLayout>
+                </com.google.android.material.card.MaterialCardView>
+
+                <com.google.android.material.card.MaterialCardView
+                    android:id="@+id/topAppsCard"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="12dp"
+                    app:cardBackgroundColor="@color/kw_card_surface"
+                    app:cardCornerRadius="28dp"
+                    app:cardElevation="0dp"
+                    app:strokeColor="@color/kw_outline_variant"
+                    app:strokeWidth="1dp">
+
+                    <LinearLayout
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:orientation="vertical"
+                        android:padding="18dp">
 
                         <TextView
                             android:layout_width="wrap_content"
                             android:layout_height="wrap_content"
                             android:text="@string/section_top_apps"
-                            android:textAppearance="@style/TextAppearance.Material3.TitleMedium" />
-
-                    <TextView
-                        android:id="@+id/tvTopApps"
-                        android:layout_width="match_parent"
-                        android:layout_height="wrap_content"
-                        android:layout_marginTop="8dp"
-                        android:text="@string/dashboard_top_apps_label"
-                        android:textAppearance="@style/TextAppearance.Material3.BodyLarge"
-                        android:visibility="gone"
-                        tools:text="Top apps: YouTube:95m, Chrome:10m" />
-
-                    <LinearLayout
-                        android:id="@+id/topAppsSkeleton"
-                        android:layout_width="match_parent"
-                        android:layout_height="wrap_content"
-                        android:layout_marginTop="8dp"
-                        android:orientation="vertical"
-                        android:visibility="gone">
-
-                        <View
-                            android:layout_width="match_parent"
-                            android:layout_height="18dp"
-                            android:background="?attr/colorSurfaceVariant" />
-
-                        <View
-                            android:layout_width="match_parent"
-                            android:layout_height="18dp"
-                            android:layout_marginTop="8dp"
-                            android:background="?attr/colorSurfaceVariant" />
-
-                        <View
-                            android:layout_width="match_parent"
-                            android:layout_height="18dp"
-                            android:layout_marginTop="8dp"
-                            android:background="?attr/colorSurfaceVariant" />
-                    </LinearLayout>
-
-                    <LinearLayout
-                        android:id="@+id/topAppsEmptyState"
-                        android:layout_width="match_parent"
-                        android:layout_height="wrap_content"
-                        android:layout_marginTop="10dp"
-                        android:orientation="vertical"
-                        android:visibility="gone">
+                            android:textAppearance="@style/TextAppearance.Material3.TitleLarge"
+                            android:textColor="@color/kw_on_surface" />
 
                         <TextView
+                            android:id="@+id/tvTopApps"
                             android:layout_width="match_parent"
                             android:layout_height="wrap_content"
-                            android:text="@string/top_apps_empty_title"
-                            android:textAppearance="@style/TextAppearance.Material3.BodyLarge" />
+                            android:layout_marginTop="6dp"
+                            android:text="@string/dashboard_top_apps_label"
+                            android:textAppearance="@style/TextAppearance.Material3.BodyMedium"
+                            android:textColor="@color/kw_on_surface_variant"
+                            tools:text="Top apps: YouTube:95m, Chrome:10m" />
 
-                        <TextView
+                        <LinearLayout
+                            android:id="@+id/topAppsSkeleton"
                             android:layout_width="match_parent"
                             android:layout_height="wrap_content"
-                            android:layout_marginTop="2dp"
-                            android:text="@string/top_apps_empty_subtitle"
-                            android:textAppearance="@style/TextAppearance.Material3.BodySmall"
-                            android:textColor="?attr/colorOnSurfaceVariant" />
+                            android:layout_marginTop="12dp"
+                            android:orientation="vertical"
+                            android:visibility="gone">
+
+                            <View
+                                android:layout_width="match_parent"
+                                android:layout_height="64dp"
+                                android:background="@drawable/bg_surface_card_alt" />
+
+                            <View
+                                android:layout_width="match_parent"
+                                android:layout_height="64dp"
+                                android:layout_marginTop="8dp"
+                                android:background="@drawable/bg_surface_card_alt" />
+
+                            <View
+                                android:layout_width="match_parent"
+                                android:layout_height="64dp"
+                                android:layout_marginTop="8dp"
+                                android:background="@drawable/bg_surface_card_alt" />
+                        </LinearLayout>
+
+                        <LinearLayout
+                            android:id="@+id/topAppsEmptyState"
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            android:layout_marginTop="12dp"
+                            android:background="@drawable/bg_surface_card_alt"
+                            android:orientation="vertical"
+                            android:padding="16dp"
+                            android:visibility="gone">
+
+                            <TextView
+                                android:layout_width="match_parent"
+                                android:layout_height="wrap_content"
+                                android:text="@string/top_apps_empty_title"
+                                android:textAppearance="@style/TextAppearance.Material3.TitleMedium"
+                                android:textColor="@color/kw_on_surface" />
+
+                            <TextView
+                                android:layout_width="match_parent"
+                                android:layout_height="wrap_content"
+                                android:layout_marginTop="6dp"
+                                android:text="@string/top_apps_empty_subtitle"
+                                android:textAppearance="@style/TextAppearance.Material3.BodyMedium"
+                                android:textColor="@color/kw_on_surface_variant" />
+                        </LinearLayout>
+
+                        <LinearLayout
+                            android:id="@+id/topAppsList"
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            android:layout_marginTop="12dp"
+                            android:orientation="vertical">
+
+                            <com.google.android.material.card.MaterialCardView
+                                android:id="@+id/topAppRow1"
+                                android:layout_width="match_parent"
+                                android:layout_height="wrap_content"
+                                app:cardBackgroundColor="@color/kw_card_surface_alt"
+                                app:cardCornerRadius="20dp"
+                                app:cardElevation="0dp"
+                                app:strokeColor="@color/kw_outline_variant"
+                                app:strokeWidth="1dp">
+
+                                <LinearLayout
+                                    android:layout_width="match_parent"
+                                    android:layout_height="wrap_content"
+                                    android:gravity="center_vertical"
+                                    android:orientation="horizontal"
+                                    android:padding="12dp">
+
+                                    <FrameLayout
+                                        android:layout_width="44dp"
+                                        android:layout_height="44dp"
+                                        android:background="@drawable/bg_pill_soft">
+
+                                        <ImageView
+                                            android:id="@+id/topAppIcon1"
+                                            android:layout_width="22dp"
+                                            android:layout_height="22dp"
+                                            android:layout_gravity="center"
+                                            android:contentDescription="@string/top_app_icon_content_description"
+                                            android:src="@drawable/ic_placeholder_apps" />
+                                    </FrameLayout>
+
+                                    <LinearLayout
+                                        android:layout_width="0dp"
+                                        android:layout_height="wrap_content"
+                                        android:layout_marginStart="12dp"
+                                        android:layout_marginEnd="10dp"
+                                        android:layout_weight="1"
+                                        android:orientation="vertical">
+
+                                        <TextView
+                                            android:id="@+id/topAppName1"
+                                            android:layout_width="match_parent"
+                                            android:layout_height="wrap_content"
+                                            android:textAppearance="@style/TextAppearance.Material3.TitleMedium"
+                                            android:textColor="@color/kw_on_surface"
+                                            tools:text="YouTube" />
+
+                                        <TextView
+                                            android:id="@+id/topAppTrend1"
+                                            android:layout_width="wrap_content"
+                                            android:layout_height="wrap_content"
+                                            android:layout_marginTop="4dp"
+                                            android:background="@drawable/bg_pill_orange"
+                                            android:paddingStart="8dp"
+                                            android:paddingTop="5dp"
+                                            android:paddingEnd="8dp"
+                                            android:paddingBottom="5dp"
+                                            android:textAppearance="@style/TextAppearance.Material3.LabelMedium"
+                                            android:textColor="@color/kw_on_surface"
+                                            tools:text="NEW" />
+                                    </LinearLayout>
+
+                                    <TextView
+                                        android:id="@+id/topAppMinutes1"
+                                        android:layout_width="wrap_content"
+                                        android:layout_height="wrap_content"
+                                        android:background="@drawable/bg_pill_soft"
+                                        android:paddingStart="10dp"
+                                        android:paddingTop="7dp"
+                                        android:paddingEnd="10dp"
+                                        android:paddingBottom="7dp"
+                                        android:textAppearance="@style/TextAppearance.Material3.LabelLarge"
+                                        android:textColor="@color/kw_on_primary_container"
+                                        tools:text="52m" />
+                                </LinearLayout>
+                            </com.google.android.material.card.MaterialCardView>
+
+                            <com.google.android.material.card.MaterialCardView
+                                android:id="@+id/topAppRow2"
+                                android:layout_width="match_parent"
+                                android:layout_height="wrap_content"
+                                android:layout_marginTop="8dp"
+                                app:cardBackgroundColor="@color/kw_card_surface_alt"
+                                app:cardCornerRadius="20dp"
+                                app:cardElevation="0dp"
+                                app:strokeColor="@color/kw_outline_variant"
+                                app:strokeWidth="1dp">
+
+                                <LinearLayout
+                                    android:layout_width="match_parent"
+                                    android:layout_height="wrap_content"
+                                    android:gravity="center_vertical"
+                                    android:orientation="horizontal"
+                                    android:padding="12dp">
+
+                                    <FrameLayout
+                                        android:layout_width="44dp"
+                                        android:layout_height="44dp"
+                                        android:background="@drawable/bg_pill_soft">
+
+                                        <ImageView
+                                            android:id="@+id/topAppIcon2"
+                                            android:layout_width="22dp"
+                                            android:layout_height="22dp"
+                                            android:layout_gravity="center"
+                                            android:contentDescription="@string/top_app_icon_content_description"
+                                            android:src="@drawable/ic_placeholder_apps" />
+                                    </FrameLayout>
+
+                                    <LinearLayout
+                                        android:layout_width="0dp"
+                                        android:layout_height="wrap_content"
+                                        android:layout_marginStart="12dp"
+                                        android:layout_marginEnd="10dp"
+                                        android:layout_weight="1"
+                                        android:orientation="vertical">
+
+                                        <TextView
+                                            android:id="@+id/topAppName2"
+                                            android:layout_width="match_parent"
+                                            android:layout_height="wrap_content"
+                                            android:textAppearance="@style/TextAppearance.Material3.TitleMedium"
+                                            android:textColor="@color/kw_on_surface"
+                                            tools:text="Chrome" />
+
+                                        <TextView
+                                            android:id="@+id/topAppTrend2"
+                                            android:layout_width="wrap_content"
+                                            android:layout_height="wrap_content"
+                                            android:layout_marginTop="4dp"
+                                            android:background="@drawable/bg_pill_orange"
+                                            android:paddingStart="8dp"
+                                            android:paddingTop="5dp"
+                                            android:paddingEnd="8dp"
+                                            android:paddingBottom="5dp"
+                                            android:textAppearance="@style/TextAppearance.Material3.LabelMedium"
+                                            android:textColor="@color/kw_on_surface"
+                                            tools:text="UP" />
+                                    </LinearLayout>
+
+                                    <TextView
+                                        android:id="@+id/topAppMinutes2"
+                                        android:layout_width="wrap_content"
+                                        android:layout_height="wrap_content"
+                                        android:background="@drawable/bg_pill_soft"
+                                        android:paddingStart="10dp"
+                                        android:paddingTop="7dp"
+                                        android:paddingEnd="10dp"
+                                        android:paddingBottom="7dp"
+                                        android:textAppearance="@style/TextAppearance.Material3.LabelLarge"
+                                        android:textColor="@color/kw_on_primary_container"
+                                        tools:text="18m" />
+                                </LinearLayout>
+                            </com.google.android.material.card.MaterialCardView>
+
+                            <com.google.android.material.card.MaterialCardView
+                                android:id="@+id/topAppRow3"
+                                android:layout_width="match_parent"
+                                android:layout_height="wrap_content"
+                                android:layout_marginTop="8dp"
+                                app:cardBackgroundColor="@color/kw_card_surface_alt"
+                                app:cardCornerRadius="20dp"
+                                app:cardElevation="0dp"
+                                app:strokeColor="@color/kw_outline_variant"
+                                app:strokeWidth="1dp">
+
+                                <LinearLayout
+                                    android:layout_width="match_parent"
+                                    android:layout_height="wrap_content"
+                                    android:gravity="center_vertical"
+                                    android:orientation="horizontal"
+                                    android:padding="12dp">
+
+                                    <FrameLayout
+                                        android:layout_width="44dp"
+                                        android:layout_height="44dp"
+                                        android:background="@drawable/bg_pill_soft">
+
+                                        <ImageView
+                                            android:id="@+id/topAppIcon3"
+                                            android:layout_width="22dp"
+                                            android:layout_height="22dp"
+                                            android:layout_gravity="center"
+                                            android:contentDescription="@string/top_app_icon_content_description"
+                                            android:src="@drawable/ic_placeholder_apps" />
+                                    </FrameLayout>
+
+                                    <LinearLayout
+                                        android:layout_width="0dp"
+                                        android:layout_height="wrap_content"
+                                        android:layout_marginStart="12dp"
+                                        android:layout_marginEnd="10dp"
+                                        android:layout_weight="1"
+                                        android:orientation="vertical">
+
+                                        <TextView
+                                            android:id="@+id/topAppName3"
+                                            android:layout_width="match_parent"
+                                            android:layout_height="wrap_content"
+                                            android:textAppearance="@style/TextAppearance.Material3.TitleMedium"
+                                            android:textColor="@color/kw_on_surface"
+                                            tools:text="Misc apps" />
+
+                                        <TextView
+                                            android:id="@+id/topAppTrend3"
+                                            android:layout_width="wrap_content"
+                                            android:layout_height="wrap_content"
+                                            android:layout_marginTop="4dp"
+                                            android:background="@drawable/bg_pill_orange"
+                                            android:paddingStart="8dp"
+                                            android:paddingTop="5dp"
+                                            android:paddingEnd="8dp"
+                                            android:paddingBottom="5dp"
+                                            android:textAppearance="@style/TextAppearance.Material3.LabelMedium"
+                                            android:textColor="@color/kw_on_surface"
+                                            tools:text="DOWN" />
+                                    </LinearLayout>
+
+                                    <TextView
+                                        android:id="@+id/topAppMinutes3"
+                                        android:layout_width="wrap_content"
+                                        android:layout_height="wrap_content"
+                                        android:background="@drawable/bg_pill_soft"
+                                        android:paddingStart="10dp"
+                                        android:paddingTop="7dp"
+                                        android:paddingEnd="10dp"
+                                        android:paddingBottom="7dp"
+                                        android:textAppearance="@style/TextAppearance.Material3.LabelLarge"
+                                        android:textColor="@color/kw_on_primary_container"
+                                        tools:text="11m" />
+                                </LinearLayout>
+                            </com.google.android.material.card.MaterialCardView>
+                        </LinearLayout>
                     </LinearLayout>
+                </com.google.android.material.card.MaterialCardView>
+
+                <com.google.android.material.card.MaterialCardView
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="12dp"
+                    app:cardBackgroundColor="@color/kw_card_surface"
+                    app:cardCornerRadius="28dp"
+                    app:cardElevation="0dp"
+                    app:strokeColor="@color/kw_outline_variant"
+                    app:strokeWidth="1dp">
 
                     <LinearLayout
-                        android:id="@+id/topAppsList"
                         android:layout_width="match_parent"
                         android:layout_height="wrap_content"
-                        android:layout_marginTop="8dp"
-                        android:orientation="vertical">
+                        android:orientation="vertical"
+                        android:padding="18dp">
+
+                        <TextView
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:text="@string/section_content_insights"
+                            android:textAppearance="@style/TextAppearance.Material3.TitleLarge"
+                            android:textColor="@color/kw_on_surface" />
+
+                        <TextView
+                            android:id="@+id/tvInsightsStatus"
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:layout_marginTop="8dp"
+                            android:background="@drawable/bg_pill_soft"
+                            android:paddingStart="12dp"
+                            android:paddingTop="8dp"
+                            android:paddingEnd="12dp"
+                            android:paddingBottom="8dp"
+                            android:text="@string/insights_loading"
+                            android:textAppearance="@style/TextAppearance.Material3.LabelLarge"
+                            android:textColor="@color/kw_on_primary_container" />
 
                         <LinearLayout
-                            android:id="@+id/topAppRow1"
+                            android:id="@+id/insightsEmptyState"
                             android:layout_width="match_parent"
                             android:layout_height="wrap_content"
-                            android:gravity="center_vertical"
-                            android:orientation="horizontal"
-                            android:paddingVertical="8dp">
-
-                            <ImageView
-                                android:id="@+id/topAppIcon1"
-                                android:layout_width="24dp"
-                                android:layout_height="24dp"
-                                android:contentDescription="@string/top_app_icon_content_description"
-                                android:src="@android:drawable/sym_def_app_icon" />
+                            android:layout_marginTop="12dp"
+                            android:background="@drawable/bg_surface_card_alt"
+                            android:orientation="vertical"
+                            android:padding="16dp"
+                            android:visibility="gone">
 
                             <TextView
-                                android:id="@+id/topAppName1"
-                                android:layout_width="0dp"
+                                android:layout_width="match_parent"
                                 android:layout_height="wrap_content"
-                                android:layout_marginStart="10dp"
-                                android:layout_weight="1"
-                                android:textAppearance="@style/TextAppearance.Material3.BodyLarge"
-                                tools:text="YouTube" />
+                                android:text="@string/insights_empty_title"
+                                android:textAppearance="@style/TextAppearance.Material3.TitleMedium"
+                                android:textColor="@color/kw_on_surface" />
 
                             <TextView
-                                android:id="@+id/topAppMinutes1"
-                                android:layout_width="wrap_content"
+                                android:layout_width="match_parent"
                                 android:layout_height="wrap_content"
+                                android:layout_marginTop="6dp"
+                                android:text="@string/insights_empty_subtitle"
                                 android:textAppearance="@style/TextAppearance.Material3.BodyMedium"
-                                tools:text="52m" />
-
-                            <TextView
-                                android:id="@+id/topAppTrend1"
-                                android:layout_width="wrap_content"
-                                android:layout_height="wrap_content"
-                                android:layout_marginStart="8dp"
-                                android:textAppearance="@style/TextAppearance.Material3.LabelSmall"
-                                android:textColor="?attr/colorOnSurfaceVariant"
-                                tools:text="NEW" />
+                                android:textColor="@color/kw_on_surface_variant" />
                         </LinearLayout>
 
                         <LinearLayout
-                            android:id="@+id/topAppRow2"
+                            android:id="@+id/insightsList"
                             android:layout_width="match_parent"
                             android:layout_height="wrap_content"
-                            android:gravity="center_vertical"
-                            android:orientation="horizontal"
-                            android:paddingVertical="8dp">
-
-                            <ImageView
-                                android:id="@+id/topAppIcon2"
-                                android:layout_width="24dp"
-                                android:layout_height="24dp"
-                                android:contentDescription="@string/top_app_icon_content_description"
-                                android:src="@android:drawable/sym_def_app_icon" />
+                            android:layout_marginTop="12dp"
+                            android:orientation="vertical">
 
                             <TextView
-                                android:id="@+id/topAppName2"
-                                android:layout_width="0dp"
+                                android:id="@+id/tvInsightRow1"
+                                android:layout_width="match_parent"
                                 android:layout_height="wrap_content"
-                                android:layout_marginStart="10dp"
-                                android:layout_weight="1"
+                                android:background="@drawable/bg_surface_card_alt"
+                                android:padding="14dp"
                                 android:textAppearance="@style/TextAppearance.Material3.BodyLarge"
-                                tools:text="Chrome" />
+                                android:textColor="@color/kw_on_surface"
+                                tools:text="Cocomelon - Safe" />
 
                             <TextView
-                                android:id="@+id/topAppMinutes2"
-                                android:layout_width="wrap_content"
+                                android:id="@+id/tvInsightRow2"
+                                android:layout_width="match_parent"
                                 android:layout_height="wrap_content"
-                                android:textAppearance="@style/TextAppearance.Material3.BodyMedium"
-                                tools:text="18m" />
-
-                            <TextView
-                                android:id="@+id/topAppTrend2"
-                                android:layout_width="wrap_content"
-                                android:layout_height="wrap_content"
-                                android:layout_marginStart="8dp"
-                                android:textAppearance="@style/TextAppearance.Material3.LabelSmall"
-                                android:textColor="?attr/colorOnSurfaceVariant"
-                                tools:text="UP" />
-                        </LinearLayout>
-
-                        <LinearLayout
-                            android:id="@+id/topAppRow3"
-                            android:layout_width="match_parent"
-                            android:layout_height="wrap_content"
-                            android:gravity="center_vertical"
-                            android:orientation="horizontal"
-                            android:paddingVertical="8dp">
-
-                            <ImageView
-                                android:id="@+id/topAppIcon3"
-                                android:layout_width="24dp"
-                                android:layout_height="24dp"
-                                android:contentDescription="@string/top_app_icon_content_description"
-                                android:src="@android:drawable/sym_def_app_icon" />
-
-                            <TextView
-                                android:id="@+id/topAppName3"
-                                android:layout_width="0dp"
-                                android:layout_height="wrap_content"
-                                android:layout_marginStart="10dp"
-                                android:layout_weight="1"
+                                android:layout_marginTop="8dp"
+                                android:background="@drawable/bg_surface_card_alt"
+                                android:padding="14dp"
                                 android:textAppearance="@style/TextAppearance.Material3.BodyLarge"
-                                tools:text="Misc apps" />
+                                android:textColor="@color/kw_on_surface"
+                                tools:text="Random Shorts - Addictive" />
 
                             <TextView
-                                android:id="@+id/topAppMinutes3"
-                                android:layout_width="wrap_content"
+                                android:id="@+id/tvInsightRow3"
+                                android:layout_width="match_parent"
                                 android:layout_height="wrap_content"
-                                android:textAppearance="@style/TextAppearance.Material3.BodyMedium"
-                                tools:text="11m" />
-
-                            <TextView
-                                android:id="@+id/topAppTrend3"
-                                android:layout_width="wrap_content"
-                                android:layout_height="wrap_content"
-                                android:layout_marginStart="8dp"
-                                android:textAppearance="@style/TextAppearance.Material3.LabelSmall"
-                                android:textColor="?attr/colorOnSurfaceVariant"
-                                tools:text="DOWN" />
+                                android:layout_marginTop="8dp"
+                                android:background="@drawable/bg_surface_card_alt"
+                                android:padding="14dp"
+                                android:textAppearance="@style/TextAppearance.Material3.BodyLarge"
+                                android:textColor="@color/kw_on_surface"
+                                tools:text="Toy review loops - Overstimulating" />
                         </LinearLayout>
                     </LinearLayout>
-
-                </LinearLayout>
                 </com.google.android.material.card.MaterialCardView>
             </LinearLayout>
 
-            <!-- Family dashboard content -->
             <LinearLayout
                 android:id="@+id/dashboardFamilyContent"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
+                android:layout_marginTop="12dp"
                 android:orientation="vertical"
                 android:visibility="gone">
 
-                <TextView
-                    android:id="@+id/tvFamilyDashboardStatus"
+                <com.google.android.material.card.MaterialCardView
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
-                    android:layout_marginTop="12dp"
-                    android:text="@string/family_dashboard_loading"
-                    android:textAppearance="@style/TextAppearance.Material3.BodyMedium"
-                    android:textColor="?attr/colorPrimary" />
+                    app:cardBackgroundColor="@color/kw_card_surface"
+                    app:cardCornerRadius="28dp"
+                    app:cardElevation="0dp"
+                    app:strokeColor="@color/kw_outline_variant"
+                    app:strokeWidth="1dp">
+
+                    <LinearLayout
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:orientation="vertical"
+                        android:padding="18dp">
+
+                        <TextView
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:background="@drawable/bg_pill_soft"
+                            android:paddingStart="12dp"
+                            android:paddingTop="8dp"
+                            android:paddingEnd="12dp"
+                            android:paddingBottom="8dp"
+                            android:text="@string/dashboard_family_badge"
+                            android:textAppearance="@style/TextAppearance.Material3.LabelLarge"
+                            android:textColor="@color/kw_on_primary_container" />
+
+                        <TextView
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            android:layout_marginTop="16dp"
+                            android:text="@string/family_dashboard_title"
+                            android:textAppearance="@style/TextAppearance.Material3.TitleLarge"
+                            android:textColor="@color/kw_on_surface" />
+
+                        <TextView
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            android:layout_marginTop="8dp"
+                            android:text="@string/dashboard_family_caption"
+                            android:textAppearance="@style/TextAppearance.Material3.BodyMedium"
+                            android:textColor="@color/kw_on_surface_variant" />
+
+                        <TextView
+                            android:id="@+id/tvFamilyDashboardStatus"
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            android:layout_marginTop="10dp"
+                            android:text="@string/family_dashboard_loading"
+                            android:textAppearance="@style/TextAppearance.Material3.BodyMedium"
+                            android:textColor="@color/kw_on_surface_variant" />
+                    </LinearLayout>
+                </com.google.android.material.card.MaterialCardView>
 
                 <LinearLayout
                     android:id="@+id/familyDevicesUsageContainer"
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
-                    android:layout_marginTop="8dp"
+                    android:layout_marginTop="10dp"
                     android:orientation="vertical" />
             </LinearLayout>
-
         </LinearLayout>
     </androidx.core.widget.NestedScrollView>
 
-    <!-- Activity tab: content insights from accessibility service -->
-    <androidx.core.widget.NestedScrollView
+    <androidx.recyclerview.widget.RecyclerView
         android:id="@+id/activityTabContent"
         android:layout_width="0dp"
         android:layout_height="0dp"
         android:clipToPadding="false"
+        android:overScrollMode="never"
         android:paddingStart="20dp"
-        android:paddingTop="16dp"
+        android:paddingTop="14dp"
         android:paddingEnd="20dp"
-        android:paddingBottom="24dp"
+        android:paddingBottom="18dp"
+        android:visibility="gone"
+        app:layout_constraintBottom_toTopOf="@id/bottomNav"
+        app:layout_constraintEnd_toEndOf="parent"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintTop_toTopOf="parent" />
+
+    <androidx.core.widget.NestedScrollView
+        android:id="@+id/manageTabContent"
+        android:layout_width="0dp"
+        android:layout_height="0dp"
+        android:clipToPadding="false"
+        android:fillViewport="true"
+        android:overScrollMode="never"
+        android:paddingStart="20dp"
+        android:paddingTop="14dp"
+        android:paddingEnd="20dp"
+        android:paddingBottom="18dp"
         android:visibility="gone"
         app:layout_constraintBottom_toTopOf="@id/bottomNav"
         app:layout_constraintEnd_toEndOf="parent"
@@ -463,191 +854,621 @@
             android:layout_height="wrap_content"
             android:orientation="vertical">
 
-            <TextView
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:text="@string/activity_title"
-                android:textAppearance="@style/TextAppearance.Material3.HeadlineMedium"
-                android:textColor="?attr/colorOnSurface" />
-
-            <TextView
+            <FrameLayout
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:layout_marginTop="4dp"
-                android:text="@string/activity_subtitle"
-                android:textAppearance="@style/TextAppearance.Material3.BodyMedium"
-                android:textColor="?attr/colorOnSurfaceVariant" />
+                android:background="@drawable/bg_hero_gradient"
+                android:padding="18dp">
 
-            <!-- Face detection status -->
-            <com.google.android.material.card.MaterialCardView
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:layout_marginTop="16dp"
-                app:cardBackgroundColor="?attr/colorSurfaceContainerLow"
-                app:cardCornerRadius="18dp"
-                app:cardElevation="0dp"
-                app:strokeColor="?attr/colorOutlineVariant"
-                app:strokeWidth="1dp">
+                <View
+                    android:layout_width="126dp"
+                    android:layout_height="126dp"
+                    android:layout_gravity="top|end"
+                    android:alpha="0.24"
+                    android:background="@drawable/bg_accent_circle"
+                    android:translationX="44dp"
+                    android:translationY="-28dp" />
 
                 <LinearLayout
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
-                    android:orientation="vertical"
-                    android:padding="16dp">
+                    android:orientation="vertical">
 
                     <TextView
                         android:layout_width="wrap_content"
                         android:layout_height="wrap_content"
-                        android:text="@string/face_detection_status_title"
-                        android:textAppearance="@style/TextAppearance.Material3.TitleMedium" />
+                        android:background="@drawable/bg_pill_dark"
+                        android:paddingStart="12dp"
+                        android:paddingTop="7dp"
+                        android:paddingEnd="12dp"
+                        android:paddingBottom="7dp"
+                        android:text="@string/manage_hero_badge"
+                        android:textAppearance="@style/TextAppearance.Material3.LabelLarge"
+                        android:textColor="@android:color/white" />
 
                     <TextView
-                        android:id="@+id/tvFaceDetectionStatus"
                         android:layout_width="match_parent"
                         android:layout_height="wrap_content"
-                        android:layout_marginTop="8dp"
-                        android:text="@string/face_detection_status_no_viewer"
-                        android:textAppearance="@style/TextAppearance.Material3.BodyMedium"
-                        android:textColor="?attr/colorOnSurfaceVariant" />
-
-                    <com.google.android.material.button.MaterialButton
-                        android:id="@+id/btnFaceDetectionPermissions"
-                        style="@style/Widget.Material3.Button.TextButton"
-                        android:layout_width="wrap_content"
-                        android:layout_height="wrap_content"
-                        android:layout_marginTop="8dp"
-                        android:text="@string/face_detection_grant_permissions"
-                        android:visibility="gone" />
-                </LinearLayout>
-            </com.google.android.material.card.MaterialCardView>
-
-            <!-- Videos watched (raw from accessibility) -->
-            <com.google.android.material.card.MaterialCardView
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:layout_marginTop="16dp"
-                app:cardBackgroundColor="?attr/colorSurfaceContainerLow"
-                app:cardCornerRadius="18dp"
-                app:cardElevation="0dp"
-                app:strokeColor="?attr/colorOutlineVariant"
-                app:strokeWidth="1dp">
-
-                <LinearLayout
-                    android:layout_width="match_parent"
-                    android:layout_height="wrap_content"
-                    android:orientation="vertical"
-                    android:padding="16dp">
+                        android:layout_marginTop="12dp"
+                        android:text="@string/manage_hero_title"
+                        android:textAppearance="@style/TextAppearance.Material3.HeadlineMedium"
+                        android:textColor="@android:color/white" />
 
                     <TextView
-                        android:layout_width="wrap_content"
-                        android:layout_height="wrap_content"
-                        android:text="@string/section_videos_watched"
-                        android:textAppearance="@style/TextAppearance.Material3.TitleMedium" />
-
-                    <TextView
-                        android:id="@+id/tvVideosWatched"
-                        android:layout_width="match_parent"
-                        android:layout_height="wrap_content"
-                        android:layout_marginTop="8dp"
-                        android:text="@string/videos_watched_empty"
-                        android:textAppearance="@style/TextAppearance.Material3.BodyMedium"
-                        android:textColor="?attr/colorOnSurfaceVariant" />
-
-                    <com.google.android.material.button.MaterialButton
-                        android:id="@+id/btnOpenAccessibilitySettings"
-                        style="@style/Widget.Material3.Button.TextButton"
-                        android:layout_width="wrap_content"
-                        android:layout_height="wrap_content"
-                        android:layout_marginTop="8dp"
-                        android:text="@string/open_accessibility_settings" />
-                </LinearLayout>
-            </com.google.android.material.card.MaterialCardView>
-
-            <com.google.android.material.card.MaterialCardView
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:layout_marginTop="16dp"
-                app:cardBackgroundColor="?attr/colorSurfaceContainerLow"
-                app:cardCornerRadius="18dp"
-                app:cardElevation="0dp"
-                app:strokeColor="?attr/colorOutlineVariant"
-                app:strokeWidth="1dp">
-
-                <LinearLayout
-                    android:layout_width="match_parent"
-                    android:layout_height="wrap_content"
-                    android:orientation="vertical"
-                    android:padding="16dp">
-
-                    <TextView
-                        android:layout_width="wrap_content"
-                        android:layout_height="wrap_content"
-                        android:text="@string/section_content_insights"
-                        android:textAppearance="@style/TextAppearance.Material3.TitleMedium" />
-
-                    <TextView
-                        android:id="@+id/tvInsightsStatus"
-                        android:layout_width="match_parent"
-                        android:layout_height="wrap_content"
-                        android:layout_marginTop="8dp"
-                        android:text="@string/insights_loading"
-                        android:textAppearance="@style/TextAppearance.Material3.BodyMedium"
-                        android:textColor="?attr/colorPrimary" />
-
-                    <LinearLayout
-                        android:id="@+id/insightsEmptyState"
-                        android:layout_width="match_parent"
-                        android:layout_height="wrap_content"
-                        android:layout_marginTop="8dp"
-                        android:orientation="vertical"
-                        android:visibility="gone">
-
-                        <TextView
-                            android:layout_width="match_parent"
-                            android:layout_height="wrap_content"
-                            android:text="@string/insights_empty_title"
-                            android:textAppearance="@style/TextAppearance.Material3.BodyLarge" />
-
-                        <TextView
-                            android:layout_width="match_parent"
-                            android:layout_height="wrap_content"
-                            android:layout_marginTop="2dp"
-                            android:text="@string/insights_empty_subtitle"
-                            android:textAppearance="@style/TextAppearance.Material3.BodySmall"
-                            android:textColor="?attr/colorOnSurfaceVariant" />
-                    </LinearLayout>
-
-                    <LinearLayout
-                        android:id="@+id/insightsList"
                         android:layout_width="match_parent"
                         android:layout_height="wrap_content"
                         android:layout_marginTop="6dp"
-                        android:orientation="vertical">
+                        android:text="@string/manage_hero_body"
+                        android:textAppearance="@style/TextAppearance.Material3.BodyMedium"
+                        android:textColor="#E6FFFFFF" />
 
-                        <TextView
-                            android:id="@+id/tvInsightRow1"
-                            android:layout_width="match_parent"
-                            android:layout_height="wrap_content"
-                            android:paddingVertical="4dp"
-                            android:textAppearance="@style/TextAppearance.Material3.BodyMedium"
-                            tools:text="Cocomelon — safe" />
+                    <TextView
+                        android:id="@+id/tvManageStatus"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="12dp"
+                        android:background="@drawable/bg_pill_dark"
+                        android:paddingStart="12dp"
+                        android:paddingTop="7dp"
+                        android:paddingEnd="12dp"
+                        android:paddingBottom="7dp"
+                        android:textAppearance="@style/TextAppearance.Material3.LabelMedium"
+                        android:textColor="@android:color/white"
+                        tools:text="3 apps tracked in Activity" />
+                </LinearLayout>
+            </FrameLayout>
 
-                        <TextView
-                            android:id="@+id/tvInsightRow2"
-                            android:layout_width="match_parent"
-                            android:layout_height="wrap_content"
-                            android:paddingVertical="4dp"
-                            android:textAppearance="@style/TextAppearance.Material3.BodyMedium"
-                            tools:text="Spinning Color Wheels — overstimulating" />
+            <com.google.android.material.card.MaterialCardView
+                android:id="@+id/manageSectionThisDevice"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="12dp"
+                app:cardBackgroundColor="@color/kw_card_surface"
+                app:cardCornerRadius="28dp"
+                app:cardElevation="0dp"
+                app:strokeColor="@color/kw_outline_variant"
+                app:strokeWidth="1dp">
 
-                        <TextView
-                            android:id="@+id/tvInsightRow3"
-                            android:layout_width="match_parent"
+                <LinearLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:orientation="vertical"
+                    android:padding="18dp">
+
+                    <TextView
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:text="@string/manage_device_title"
+                        android:textAppearance="@style/TextAppearance.Material3.TitleLarge"
+                        android:textColor="@color/kw_on_surface" />
+
+                    <TextView
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="6dp"
+                        android:text="@string/manage_device_body"
+                        android:textAppearance="@style/TextAppearance.Material3.BodyMedium"
+                        android:textColor="@color/kw_on_surface_variant" />
+
+                    <TextView
+                        android:id="@+id/tvManageDeviceName"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="12dp"
+                        android:textAppearance="@style/TextAppearance.Material3.HeadlineSmall"
+                        android:textColor="@color/kw_on_surface"
+                        tools:text="Mom phone" />
+
+                    <TextView
+                        android:id="@+id/tvManageDeviceSummary"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="4dp"
+                        android:textAppearance="@style/TextAppearance.Material3.BodyMedium"
+                        android:textColor="@color/kw_on_surface_variant"
+                        tools:text="2 family phones linked" />
+
+                    <TextView
+                        android:id="@+id/tvManageLinkedNames"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="4dp"
+                        android:textAppearance="@style/TextAppearance.Material3.BodySmall"
+                        android:textColor="@color/kw_on_surface_variant"
+                        tools:text="Linked: Papa, Dadi" />
+
+                    <TextView
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="14dp"
+                        android:text="@string/manage_owner_heading"
+                        android:textAppearance="@style/TextAppearance.Material3.TitleMedium"
+                        android:textColor="@color/kw_on_surface" />
+
+                    <TextView
+                        android:id="@+id/tvManageOwnerName"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="6dp"
+                        android:textAppearance="@style/TextAppearance.Material3.BodyMedium"
+                        android:textColor="@color/kw_on_surface"
+                        tools:text="Device owner: Mom" />
+
+                    <com.google.android.material.button.MaterialButton
+                        android:id="@+id/btnManageEditOwner"
+                        style="@style/Widget.Material3.Button.TonalButton"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="10dp"
+                        android:text="@string/manage_owner_edit"
+                        app:icon="@drawable/ic_settings_tune"
+                        app:iconPadding="8dp"
+                        app:iconTint="@color/kw_on_primary_container" />
+
+                    <TextView
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="14dp"
+                        android:text="@string/manage_tester_heading"
+                        android:textAppearance="@style/TextAppearance.Material3.TitleMedium"
+                        android:textColor="@color/kw_on_surface" />
+
+                    <TextView
+                        android:id="@+id/tvManageTesterSummary"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="6dp"
+                        android:textAppearance="@style/TextAppearance.Material3.BodyMedium"
+                        android:textColor="@color/kw_on_surface"
+                        tools:text="Tester: Shreya • Ends with 3210" />
+
+                    <TextView
+                        android:id="@+id/tvManageTesterMeta"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="4dp"
+                        android:textAppearance="@style/TextAppearance.Material3.BodySmall"
+                        android:textColor="@color/kw_on_surface_variant"
+                        tools:text="Cohort: manual-apk" />
+
+                    <com.google.android.material.button.MaterialButton
+                        android:id="@+id/btnManageEditTester"
+                        style="@style/Widget.Material3.Button.TonalButton"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="10dp"
+                        android:text="@string/manage_tester_edit"
+                        app:icon="@drawable/ic_settings_tune"
+                        app:iconPadding="8dp"
+                        app:iconTint="@color/kw_on_primary_container" />
+
+                    <TextView
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="14dp"
+                        android:text="@string/manage_children_heading"
+                        android:textAppearance="@style/TextAppearance.Material3.TitleMedium"
+                        android:textColor="@color/kw_on_surface" />
+
+                    <TextView
+                        android:id="@+id/tvManageChildrenEmpty"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="6dp"
+                        android:text="@string/manage_children_empty"
+                        android:textAppearance="@style/TextAppearance.Material3.BodySmall"
+                        android:textColor="@color/kw_on_surface_variant" />
+
+                    <LinearLayout
+                        android:id="@+id/layoutManageChildren"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="10dp"
+                        android:orientation="vertical" />
+
+                    <com.google.android.material.button.MaterialButton
+                        android:id="@+id/btnManageAddChild"
+                        style="@style/Widget.Material3.Button.TonalButton"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="10dp"
+                        android:text="@string/manage_children_add"
+                        app:icon="@drawable/ic_viewer_check"
+                        app:iconPadding="8dp"
+                        app:iconTint="@color/kw_on_primary_container" />
+
+                    <LinearLayout
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="14dp"
+                        android:orientation="horizontal">
+
+                        <com.google.android.material.button.MaterialButton
+                            android:id="@+id/btnManageShowQr"
+                            android:layout_width="0dp"
                             android:layout_height="wrap_content"
-                            android:paddingVertical="4dp"
-                            android:textAppearance="@style/TextAppearance.Material3.BodyMedium"
-                            tools:text="Random Shorts — addictive" />
+                            android:layout_weight="1"
+                            android:text="@string/dashboard_qr_show_short"
+                            app:icon="@drawable/ic_action_share"
+                            app:iconPadding="8dp"
+                            app:iconTint="@android:color/white" />
+
+                        <com.google.android.material.button.MaterialButton
+                            android:id="@+id/btnManageScanQr"
+                            style="@style/Widget.Material3.Button.TonalButton"
+                            android:layout_width="0dp"
+                            android:layout_height="wrap_content"
+                            android:layout_marginStart="10dp"
+                            android:layout_weight="1"
+                            android:text="@string/dashboard_qr_scan_short"
+                            app:icon="@drawable/ic_action_scan"
+                            app:iconPadding="8dp"
+                            app:iconTint="@color/kw_on_primary_container" />
                     </LinearLayout>
+                </LinearLayout>
+            </com.google.android.material.card.MaterialCardView>
+
+            <com.google.android.material.card.MaterialCardView
+                android:id="@+id/manageSectionMonitoringApps"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="12dp"
+                app:cardBackgroundColor="@color/kw_card_surface"
+                app:cardCornerRadius="28dp"
+                app:cardElevation="0dp"
+                app:strokeColor="@color/kw_outline_variant"
+                app:strokeWidth="1dp">
+
+                <LinearLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:orientation="vertical"
+                    android:padding="18dp">
+
+                    <TextView
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:text="@string/manage_monitoring_title"
+                        android:textAppearance="@style/TextAppearance.Material3.TitleLarge"
+                        android:textColor="@color/kw_on_surface" />
+
+                    <TextView
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="6dp"
+                        android:text="@string/manage_monitoring_body"
+                        android:textAppearance="@style/TextAppearance.Material3.BodyMedium"
+                        android:textColor="@color/kw_on_surface_variant" />
+
+                    <TextView
+                        android:id="@+id/tvManageMonitoringSummary"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="12dp"
+                        android:textAppearance="@style/TextAppearance.Material3.BodyMedium"
+                        android:textColor="@color/kw_on_surface"
+                        tools:text="4 apps tracked in Activity • 3 save screenshots • 3 use face capture" />
+
+                    <TextView
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="12dp"
+                        android:text="@string/manage_category_heading"
+                        android:textAppearance="@style/TextAppearance.Material3.TitleMedium"
+                        android:textColor="@color/kw_on_surface" />
+
+                    <com.google.android.material.chip.ChipGroup
+                        android:id="@+id/manageCategoryChipGroup"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="10dp"
+                        app:singleLine="false" />
+
+                    <com.google.android.material.button.MaterialButton
+                        android:id="@+id/btnManageOpenMonitoring"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="14dp"
+                        android:text="@string/manage_monitoring_open"
+                        app:icon="@drawable/ic_settings_tune"
+                        app:iconPadding="8dp"
+                        app:iconTint="@android:color/white" />
+                </LinearLayout>
+            </com.google.android.material.card.MaterialCardView>
+
+            <com.google.android.material.card.MaterialCardView
+                android:id="@+id/manageSectionUnknownViewers"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="12dp"
+                app:cardBackgroundColor="@color/kw_card_surface"
+                app:cardCornerRadius="28dp"
+                app:cardElevation="0dp"
+                app:strokeColor="@color/kw_outline_variant"
+                app:strokeWidth="1dp">
+
+                <LinearLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:orientation="vertical"
+                    android:padding="18dp">
+
+                    <TextView
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:text="@string/evidence_clusters_title"
+                        android:textAppearance="@style/TextAppearance.Material3.TitleLarge"
+                        android:textColor="@color/kw_on_surface" />
+
+                    <TextView
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="6dp"
+                        android:text="@string/evidence_clusters_body"
+                        android:textAppearance="@style/TextAppearance.Material3.BodyMedium"
+                        android:textColor="@color/kw_on_surface_variant" />
+
+                    <TextView
+                        android:id="@+id/tvManageUnknownClusters"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="12dp"
+                        android:textAppearance="@style/TextAppearance.Material3.BodyMedium"
+                        android:textColor="@color/kw_on_surface"
+                        tools:text="Unknown viewers to review: 2" />
+
+                    <TextView
+                        android:id="@+id/tvManageClusterEmpty"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="12dp"
+                        android:text="@string/evidence_cluster_empty"
+                        android:textAppearance="@style/TextAppearance.Material3.BodyMedium"
+                        android:textColor="@color/kw_on_surface_variant"
+                        android:visibility="gone" />
+
+                    <LinearLayout
+                        android:id="@+id/manageClusterReviewContainer"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="12dp"
+                        android:orientation="vertical" />
+                </LinearLayout>
+            </com.google.android.material.card.MaterialCardView>
+
+            <com.google.android.material.card.MaterialCardView
+                android:id="@+id/manageSectionPermissions"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="12dp"
+                app:cardBackgroundColor="@color/kw_card_surface"
+                app:cardCornerRadius="28dp"
+                app:cardElevation="0dp"
+                app:strokeColor="@color/kw_outline_variant"
+                app:strokeWidth="1dp">
+
+                <LinearLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:orientation="vertical"
+                    android:padding="18dp">
+
+                    <TextView
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:text="@string/manage_permissions_title"
+                        android:textAppearance="@style/TextAppearance.Material3.TitleLarge"
+                        android:textColor="@color/kw_on_surface" />
+
+                    <TextView
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="6dp"
+                        android:text="@string/manage_permissions_body"
+                        android:textAppearance="@style/TextAppearance.Material3.BodyMedium"
+                        android:textColor="@color/kw_on_surface_variant" />
+
+                    <TextView
+                        android:id="@+id/tvManagePermissionsSummary"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="12dp"
+                        android:background="@drawable/bg_surface_card_alt"
+                        android:padding="14dp"
+                        android:textAppearance="@style/TextAppearance.Material3.BodyMedium"
+                        android:textColor="@color/kw_on_surface"
+                        tools:text="Usage access is on.\nCamera access is on." />
+
+                    <com.google.android.material.button.MaterialButton
+                        android:id="@+id/btnManageProjection"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="14dp"
+                        android:text="@string/evidence_projection_button"
+                        app:icon="@drawable/ic_refresh"
+                        app:iconPadding="8dp"
+                        app:iconTint="@android:color/white" />
+
+                    <TextView
+                        android:id="@+id/tvManagePermissionsManualHint"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="12dp"
+                        android:text="@string/manage_permissions_manual_hint"
+                        android:textAppearance="@style/TextAppearance.Material3.BodySmall"
+                        android:textColor="@color/kw_on_surface_variant"
+                        android:visibility="gone" />
+
+                    <LinearLayout
+                        android:id="@+id/layoutManageManualPermissionActions"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="10dp"
+                        android:orientation="vertical"
+                        android:visibility="gone">
+
+                        <LinearLayout
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            android:orientation="horizontal">
+
+                            <com.google.android.material.button.MaterialButton
+                                android:id="@+id/btnManageUsageAccess"
+                                style="@style/Widget.Material3.Button.OutlinedButton"
+                                android:layout_width="0dp"
+                                android:layout_height="wrap_content"
+                                android:layout_weight="1"
+                                android:text="@string/evidence_usage_button"
+                                app:icon="@drawable/ic_metric_clock"
+                                app:iconPadding="8dp"
+                                app:iconTint="@color/kw_on_surface" />
+
+                            <com.google.android.material.button.MaterialButton
+                                android:id="@+id/btnManageCamera"
+                                style="@style/Widget.Material3.Button.OutlinedButton"
+                                android:layout_width="0dp"
+                                android:layout_height="wrap_content"
+                                android:layout_marginStart="10dp"
+                                android:layout_weight="1"
+                                android:text="@string/evidence_camera_button"
+                                app:icon="@drawable/ic_viewer_check"
+                                app:iconPadding="8dp"
+                                app:iconTint="@color/kw_on_surface" />
+                        </LinearLayout>
+
+                        <LinearLayout
+                            android:id="@+id/layoutManageManualPermissionRow2"
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            android:layout_marginTop="10dp"
+                            android:orientation="horizontal">
+
+                            <com.google.android.material.button.MaterialButton
+                                android:id="@+id/btnManageAccessibility"
+                                style="@style/Widget.Material3.Button.OutlinedButton"
+                                android:layout_width="match_parent"
+                                android:layout_height="wrap_content"
+                                android:text="@string/evidence_accessibility_button"
+                                app:icon="@drawable/ic_accessibility_capture"
+                                app:iconPadding="8dp"
+                                app:iconTint="@color/kw_on_surface" />
+                        </LinearLayout>
+                    </LinearLayout>
+                </LinearLayout>
+            </com.google.android.material.card.MaterialCardView>
+
+            <com.google.android.material.card.MaterialCardView
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="12dp"
+                app:cardBackgroundColor="@color/kw_card_surface"
+                app:cardCornerRadius="28dp"
+                app:cardElevation="0dp"
+                app:strokeColor="@color/kw_outline_variant"
+                app:strokeWidth="1dp">
+
+                <LinearLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:orientation="vertical"
+                    android:padding="18dp">
+
+                    <TextView
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:text="@string/manage_privacy_title"
+                        android:textAppearance="@style/TextAppearance.Material3.TitleLarge"
+                        android:textColor="@color/kw_on_surface" />
+
+                    <TextView
+                        android:id="@+id/tvManagePrivacyBody"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="6dp"
+                        android:textAppearance="@style/TextAppearance.Material3.BodyMedium"
+                        android:textColor="@color/kw_on_surface_variant"
+                        tools:text="Evidence stays on this phone for 3 days by default." />
+
+                    <com.google.android.material.button.MaterialButton
+                        android:id="@+id/btnManagePrivacy"
+                        style="@style/Widget.Material3.Button.TonalButton"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="14dp"
+                        android:text="@string/manage_privacy_button" />
+
+                    <com.google.android.material.button.MaterialButton
+                        android:id="@+id/btnManageTerms"
+                        style="@style/Widget.Material3.Button.TonalButton"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="8dp"
+                        android:text="@string/manage_terms_button" />
+
+                    <com.google.android.material.button.MaterialButton
+                        android:id="@+id/btnManageEvidenceInfo"
+                        style="@style/Widget.Material3.Button.TonalButton"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="8dp"
+                        android:text="@string/manage_evidence_button" />
+                </LinearLayout>
+            </com.google.android.material.card.MaterialCardView>
+
+            <com.google.android.material.card.MaterialCardView
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="12dp"
+                app:cardBackgroundColor="@color/kw_card_surface"
+                app:cardCornerRadius="28dp"
+                app:cardElevation="0dp"
+                app:strokeColor="@color/kw_outline_variant"
+                app:strokeWidth="1dp">
+
+                <LinearLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:orientation="vertical"
+                    android:padding="18dp">
+
+                    <TextView
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:text="@string/manage_data_title"
+                        android:textAppearance="@style/TextAppearance.Material3.TitleLarge"
+                        android:textColor="@color/kw_on_surface" />
+
+                    <TextView
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="6dp"
+                        android:text="@string/manage_data_body"
+                        android:textAppearance="@style/TextAppearance.Material3.BodyMedium"
+                        android:textColor="@color/kw_on_surface_variant" />
+
+                    <com.google.android.material.button.MaterialButton
+                        android:id="@+id/btnManageDeleteEvidence"
+                        style="@style/Widget.Material3.Button.OutlinedButton"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="14dp"
+                        android:text="@string/evidence_delete_button" />
+
+                    <com.google.android.material.button.MaterialButton
+                        android:id="@+id/btnManageClearHistory"
+                        style="@style/Widget.Material3.Button.OutlinedButton"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="8dp"
+                        android:text="@string/manage_clear_history_button" />
+
+                    <com.google.android.material.button.MaterialButton
+                        android:id="@+id/btnManageUnlinkDevice"
+                        style="@style/Widget.Material3.Button.OutlinedButton"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="8dp"
+                        android:text="@string/manage_unlink_device_button" />
                 </LinearLayout>
             </com.google.android.material.card.MaterialCardView>
         </LinearLayout>
@@ -657,13 +1478,18 @@
         android:id="@+id/bottomNav"
         android:layout_width="0dp"
         android:layout_height="wrap_content"
-        android:background="?attr/colorSurfaceContainerLow"
-        app:itemIconTint="?attr/colorPrimary"
-        app:itemTextColor="?attr/colorOnSurfaceVariant"
+        android:layout_marginStart="10dp"
+        android:layout_marginEnd="10dp"
+        android:layout_marginBottom="8dp"
+        android:background="@drawable/bg_bottom_nav"
+        android:paddingTop="8dp"
+        android:paddingBottom="8dp"
+        app:itemIconTint="@color/bottom_nav_item_tint"
+        app:itemTextColor="@color/bottom_nav_item_tint"
         app:labelVisibilityMode="labeled"
-        app:menu="@menu/bottom_nav_main"
         app:layout_constraintBottom_toBottomOf="parent"
         app:layout_constraintEnd_toEndOf="parent"
-        app:layout_constraintStart_toStartOf="parent" />
+        app:layout_constraintStart_toStartOf="parent"
+        app:menu="@menu/bottom_nav_main" />
 
 </androidx.constraintlayout.widget.ConstraintLayout>
