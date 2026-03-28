@@ -4,7 +4,6 @@ import android.Manifest
 import android.app.Activity
 import android.content.Context
 import android.content.Intent
-import android.provider.Settings
 import android.content.pm.PackageManager
 import android.graphics.Bitmap
 import android.media.projection.MediaProjectionManager
@@ -60,6 +59,11 @@ import com.kidwatch.app.services.EvidencePreferences
 import com.kidwatch.app.services.MediaProjectionPermissionStore
 import com.kidwatch.app.services.FaceCaptureState
 import com.kidwatch.app.services.MonitoringPolicyCatalog
+import com.kidwatch.app.services.PermissionGuideAction
+import com.kidwatch.app.services.PermissionGuideNavigator
+import com.kidwatch.app.services.PermissionGuideState
+import com.kidwatch.app.services.PermissionGuidance
+import com.kidwatch.app.services.PermissionRequirement
 import com.kidwatch.app.services.TesterProfileStore
 import com.kidwatch.app.services.UsageAccessHelper
 import com.kidwatch.app.ui.ActivityFeedFilter
@@ -153,7 +157,12 @@ class MainActivity : AppCompatActivity() {
     private lateinit var managePermissionsSummaryText: TextView
     private lateinit var managePermissionsManualHintText: TextView
     private lateinit var manageManualPermissionActions: LinearLayout
-    private lateinit var manageManualPermissionRow2: LinearLayout
+    private lateinit var manageUsageGuideCard: MaterialCardView
+    private lateinit var manageUsageStatusText: TextView
+    private lateinit var manageUsageBodyText: TextView
+    private lateinit var manageAccessibilityGuideCard: MaterialCardView
+    private lateinit var manageAccessibilityStatusText: TextView
+    private lateinit var manageAccessibilityBodyText: TextView
     private lateinit var btnManageProjection: MaterialButton
     private lateinit var btnManageUsageAccess: MaterialButton
     private lateinit var btnManageCamera: MaterialButton
@@ -185,6 +194,9 @@ class MainActivity : AppCompatActivity() {
     }
     private val testerProfileStore by lazy { TesterProfileStore(this) }
     private val analyticsTracker by lazy { AnalyticsTracker(this) }
+    private val permissionGuidance by lazy { PermissionGuidance(this) }
+    private var pendingGuideRequirement: PermissionRequirement? = null
+    private var pendingGuideAction: PermissionGuideAction? = null
 
     private data class TopAppRow(
         val container: View,
@@ -211,6 +223,11 @@ class MainActivity : AppCompatActivity() {
     ) {
         updateUsageAccessState()
         val usageGranted = UsageAccessHelper.hasUsageAccess(this)
+        handlePendingPermissionGuideReturn(
+            requirement = PermissionRequirement.USAGE_ACCESS,
+            action = PermissionGuideAction.OPEN_USAGE_ACCESS_SETTINGS,
+            grantedOverride = usageGranted
+        )
         analyticsTracker.markUsageAccessGrantedIfNeeded(usageGranted)
         if (usageGranted) AutoMonitoringService.start(applicationContext)
         if (pendingEvidenceStart && UsageAccessHelper.hasUsageAccess(this)) {
@@ -345,7 +362,7 @@ class MainActivity : AppCompatActivity() {
         }
         btnManageProjection.setOnClickListener { handleManageEvidenceAction() }
         btnManageUsageAccess.setOnClickListener {
-            usageAccessLauncher.launch(UsageAccessHelper.createUsageAccessIntent())
+            launchPermissionGuide(permissionGuidance.stateFor(PermissionRequirement.USAGE_ACCESS))
         }
         btnManageCamera.setOnClickListener {
             if (hasCameraPermission()) {
@@ -355,7 +372,7 @@ class MainActivity : AppCompatActivity() {
             }
         }
         btnManageAccessibility.setOnClickListener {
-            startActivity(Intent(Settings.ACTION_ACCESSIBILITY_SETTINGS))
+            launchPermissionGuide(permissionGuidance.stateFor(PermissionRequirement.ACCESSIBILITY))
         }
         btnManagePrivacy.setOnClickListener {
             startActivity(LegalDocumentActivity.createIntent(this, LegalDocumentActivity.TYPE_PRIVACY))
@@ -374,6 +391,9 @@ class MainActivity : AppCompatActivity() {
 
     override fun onResume() {
         super.onResume()
+        if (pendingGuideAction != PermissionGuideAction.OPEN_USAGE_ACCESS_SETTINGS) {
+            handlePendingPermissionGuideReturn()
+        }
         EvidencePreferences.syncScreenCaptureAvailability(this, MediaProjectionPermissionStore.hasGrant())
         analyticsTracker.markAccessibilityEnabledIfNeeded(AccessibilityServiceState.isContentCaptureEnabled(this))
         analyticsTracker.markCameraGrantedIfNeeded(hasCameraPermission())
@@ -462,7 +482,12 @@ class MainActivity : AppCompatActivity() {
         managePermissionsSummaryText = findViewById(R.id.tvManagePermissionsSummary)
         managePermissionsManualHintText = findViewById(R.id.tvManagePermissionsManualHint)
         manageManualPermissionActions = findViewById(R.id.layoutManageManualPermissionActions)
-        manageManualPermissionRow2 = findViewById(R.id.layoutManageManualPermissionRow2)
+        manageUsageGuideCard = findViewById(R.id.cardManageUsageGuide)
+        manageUsageStatusText = findViewById(R.id.tvManageUsageStatus)
+        manageUsageBodyText = findViewById(R.id.tvManageUsageBody)
+        manageAccessibilityGuideCard = findViewById(R.id.cardManageAccessibilityGuide)
+        manageAccessibilityStatusText = findViewById(R.id.tvManageAccessibilityStatus)
+        manageAccessibilityBodyText = findViewById(R.id.tvManageAccessibilityBody)
         btnManageProjection = findViewById(R.id.btnManageProjection)
         btnManageUsageAccess = findViewById(R.id.btnManageUsageAccess)
         btnManageCamera = findViewById(R.id.btnManageCamera)
@@ -714,6 +739,7 @@ class MainActivity : AppCompatActivity() {
         )
         renderManageCategoryChips(monitoringSummary.recommendedCategoryCounts)
         managePermissionsSummaryText.text = buildManagePermissionSummary(state)
+        renderManagePermissionGuides()
         renderEvidenceCaptureButtons(state)
         renderManageManualPermissionActions(state)
         renderManageUnknownClusters(state.unknownClusters)
@@ -894,6 +920,25 @@ class MainActivity : AppCompatActivity() {
         return lines.joinToString("\n")
     }
 
+    private fun renderManagePermissionGuides() {
+        val usageState = permissionGuidance.stateFor(PermissionRequirement.USAGE_ACCESS)
+        val accessibilityState = permissionGuidance.stateFor(PermissionRequirement.ACCESSIBILITY)
+        applyPermissionGuide(
+            state = usageState,
+            card = manageUsageGuideCard,
+            statusView = manageUsageStatusText,
+            bodyView = manageUsageBodyText,
+            button = btnManageUsageAccess
+        )
+        applyPermissionGuide(
+            state = accessibilityState,
+            card = manageAccessibilityGuideCard,
+            statusView = manageAccessibilityStatusText,
+            bodyView = manageAccessibilityBodyText,
+            button = btnManageAccessibility
+        )
+    }
+
     private fun renderManageManualPermissionActions(state: ManageUiState) {
         val showUsage = !state.permissions.usageAccess
         val showCamera = !state.permissions.cameraAccess
@@ -903,12 +948,70 @@ class MainActivity : AppCompatActivity() {
 
         managePermissionsManualHintText.visibility = if (showManualFallbacks) View.VISIBLE else View.GONE
         manageManualPermissionActions.visibility = if (showManualFallbacks) View.VISIBLE else View.GONE
-        manageManualPermissionRow2.visibility = if (showAccessibility) View.VISIBLE else View.GONE
-
-        btnManageProjection.visibility = if (showProjection) View.VISIBLE else View.GONE
-        btnManageUsageAccess.visibility = if (showUsage) View.VISIBLE else View.GONE
+        manageUsageGuideCard.visibility = if (showUsage) View.VISIBLE else View.GONE
+        manageAccessibilityGuideCard.visibility = if (showAccessibility) View.VISIBLE else View.GONE
         btnManageCamera.visibility = if (showCamera) View.VISIBLE else View.GONE
-        btnManageAccessibility.visibility = if (showAccessibility) View.VISIBLE else View.GONE
+        btnManageProjection.visibility = if (showProjection) View.VISIBLE else View.GONE
+    }
+
+    private fun applyPermissionGuide(
+        state: PermissionGuideState,
+        card: View,
+        statusView: TextView,
+        bodyView: TextView,
+        button: MaterialButton
+    ) {
+        card.visibility = if (state.isReady) View.GONE else View.VISIBLE
+        statusView.text = state.statusText
+        statusView.setBackgroundResource(
+            if (state.highlightStatus) R.drawable.bg_pill_orange else R.drawable.bg_pill_soft
+        )
+        statusView.setTextColor(
+            ContextCompat.getColor(
+                this,
+                if (state.highlightStatus) R.color.kw_on_surface else R.color.kw_on_primary_container
+            )
+        )
+        bodyView.text = state.instructions
+        button.text = state.ctaText.orEmpty()
+    }
+
+    private fun launchPermissionGuide(state: PermissionGuideState) {
+        val intent = PermissionGuideNavigator.createIntent(this, state.ctaAction) ?: return
+        permissionGuidance.markActionLaunched(state.ctaAction)
+        pendingGuideRequirement = state.requirement
+        pendingGuideAction = state.ctaAction
+        analyticsTracker.logPermissionGuideLaunched(
+            requirement = state.requirement.name.lowercase(),
+            step = state.ctaAction.analyticsValue
+        )
+        if (state.ctaAction == PermissionGuideAction.OPEN_USAGE_ACCESS_SETTINGS) {
+            usageAccessLauncher.launch(intent)
+        } else {
+            startActivity(intent)
+        }
+    }
+
+    private fun handlePendingPermissionGuideReturn(
+        requirement: PermissionRequirement? = pendingGuideRequirement,
+        action: PermissionGuideAction? = pendingGuideAction,
+        grantedOverride: Boolean? = null
+    ) {
+        val resolvedRequirement = requirement ?: return
+        val resolvedAction = action ?: return
+        val isGranted = grantedOverride ?: permissionGuidance.stateFor(resolvedRequirement).isReady
+        analyticsTracker.logPermissionGuideReturned(
+            requirement = resolvedRequirement.name.lowercase(),
+            step = resolvedAction.analyticsValue,
+            granted = isGranted
+        )
+        if (
+            resolvedRequirement == pendingGuideRequirement &&
+            resolvedAction == pendingGuideAction
+        ) {
+            pendingGuideRequirement = null
+            pendingGuideAction = null
+        }
     }
 
     private fun resolveManageGuidance(state: ManageUiState): String {
@@ -978,12 +1081,12 @@ class MainActivity : AppCompatActivity() {
     private fun continueEvidenceStartFlow() {
         if (!UsageAccessHelper.hasUsageAccess(this)) {
             Toast.makeText(this, getString(R.string.evidence_usage_required_first), Toast.LENGTH_SHORT).show()
-            usageAccessLauncher.launch(UsageAccessHelper.createUsageAccessIntent())
+            launchPermissionGuide(permissionGuidance.stateFor(PermissionRequirement.USAGE_ACCESS))
             return
         }
         if (!AccessibilityServiceState.isContentCaptureEnabled(this)) {
             Toast.makeText(this, getString(R.string.evidence_accessibility_required_first), Toast.LENGTH_SHORT).show()
-            startActivity(Intent(Settings.ACTION_ACCESSIBILITY_SETTINGS))
+            launchPermissionGuide(permissionGuidance.stateFor(PermissionRequirement.ACCESSIBILITY))
             return
         }
         if (!hasCameraPermission()) {
@@ -2182,6 +2285,8 @@ class MainActivity : AppCompatActivity() {
                 addFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP or Intent.FLAG_ACTIVITY_SINGLE_TOP)
             }
         }
+
+        fun permissionSectionId(): String = MANAGE_SECTION_PERMISSIONS
     }
 }
 

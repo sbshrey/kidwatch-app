@@ -590,6 +590,15 @@
                                         android:textAppearance="@style/TextAppearance.Material3.LabelMedium"
                                         android:textColor="@color/kw_on_primary_container" />
 
+                                    <TextView
+                                        android:id="@+id/tvOnboardingUsageBody"
+                                        android:layout_width="match_parent"
+                                        android:layout_height="wrap_content"
+                                        android:layout_marginTop="10dp"
+                                        android:textAppearance="@style/TextAppearance.Material3.BodySmall"
+                                        android:textColor="@color/kw_on_surface_variant"
+                                        tools:text="Open Usage access, find KidWatch in the list, and turn it on." />
+
                                     <com.google.android.material.button.MaterialButton
                                         android:id="@+id/btnOnboardingUsageAccess"
                                         style="@style/Widget.Material3.Button.TonalButton"
@@ -639,6 +648,15 @@
                                         android:textAppearance="@style/TextAppearance.Material3.LabelMedium"
                                         android:textColor="@color/kw_on_surface" />
 
+                                    <TextView
+                                        android:id="@+id/tvOnboardingAccessibilityBody"
+                                        android:layout_width="match_parent"
+                                        android:layout_height="wrap_content"
+                                        android:layout_marginTop="10dp"
+                                        android:textAppearance="@style/TextAppearance.Material3.BodySmall"
+                                        android:textColor="@color/kw_on_surface_variant"
+                                        tools:text="Open App info, allow restricted settings, then turn on KidWatch Content Monitor in Accessibility." />
+
                                     <com.google.android.material.button.MaterialButton
                                         android:id="@+id/btnOnboardingAccessibility"
                                         style="@style/Widget.Material3.Button.OutlinedButton"
@@ -650,6 +668,26 @@
                                 </LinearLayout>
                             </com.google.android.material.card.MaterialCardView>
                         </LinearLayout>
+
+                        <TextView
+                            android:id="@+id/tvOnboardingPermissionWarning"
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            android:layout_marginTop="14dp"
+                            android:background="@drawable/bg_pill_orange"
+                            android:padding="14dp"
+                            android:text="@string/onboarding_permission_warning"
+                            android:textAppearance="@style/TextAppearance.Material3.BodySmall"
+                            android:textColor="@color/kw_on_surface" />
+
+                        <TextView
+                            android:id="@+id/tvOnboardingPermissionNote"
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            android:layout_marginTop="10dp"
+                            android:text="@string/permission_distribution_note"
+                            android:textAppearance="@style/TextAppearance.Material3.BodySmall"
+                            android:textColor="@color/kw_on_surface_variant" />
                     </LinearLayout>
                 </com.google.android.material.card.MaterialCardView>
             </LinearLayout>

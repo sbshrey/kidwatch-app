@@ -1,8 +1,8 @@
 package com.kidwatch.app
 
 import android.content.Intent
+import android.os.Build
 import android.os.Bundle
-import android.provider.Settings
 import android.view.View
 import android.widget.TextView
 import android.widget.ViewFlipper
@@ -14,10 +14,13 @@ import com.google.android.material.chip.Chip
 import com.google.android.material.textfield.TextInputEditText
 import com.kidwatch.app.analytics.AnalyticsTracker
 import com.kidwatch.app.monitoring.MonitoringScheduler
-import com.kidwatch.app.services.AccessibilityServiceState
 import com.kidwatch.app.services.DeviceInfoProvider
+import com.kidwatch.app.services.PermissionGuideAction
+import com.kidwatch.app.services.PermissionGuideNavigator
+import com.kidwatch.app.services.PermissionGuideState
+import com.kidwatch.app.services.PermissionGuidance
+import com.kidwatch.app.services.PermissionRequirement
 import com.kidwatch.app.services.TesterProfileStore
-import com.kidwatch.app.services.UsageAccessHelper
 
 class OnboardingActivity : AppCompatActivity() {
 
@@ -42,6 +45,10 @@ class OnboardingActivity : AppCompatActivity() {
     private lateinit var chipSuggestionKid: Chip
     private lateinit var usageStatus: TextView
     private lateinit var accessibilityStatus: TextView
+    private lateinit var usageBody: TextView
+    private lateinit var accessibilityBody: TextView
+    private lateinit var permissionWarning: TextView
+    private lateinit var permissionNote: TextView
     private lateinit var btnGrantUsageAccess: MaterialButton
     private lateinit var btnOpenAccessibility: MaterialButton
 
@@ -50,6 +57,9 @@ class OnboardingActivity : AppCompatActivity() {
     }
     private val testerProfileStore by lazy { TesterProfileStore(this) }
     private val analyticsTracker by lazy { AnalyticsTracker(this) }
+    private val permissionGuidance by lazy { PermissionGuidance(this) }
+    private var pendingGuideRequirement: PermissionRequirement? = null
+    private var pendingGuideAction: PermissionGuideAction? = null
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -58,7 +68,7 @@ class OnboardingActivity : AppCompatActivity() {
         val storedName = profilePrefs.getString(ProfilePreferences.PREF_PREFERRED_NAME, "").orEmpty()
         val testerState = testerProfileStore.getState()
         if (storedName.isNotBlank() && testerState.isTesterProfileComplete) {
-            openDashboard()
+            openDashboard(permissionGuidance.hasUnresolvedCorePermissions())
             return
         }
 
@@ -77,6 +87,7 @@ class OnboardingActivity : AppCompatActivity() {
     override fun onResume() {
         super.onResume()
         if (::viewFlipper.isInitialized) {
+            handlePendingPermissionReturn()
             refreshPermissionState()
             trackPermissionMilestones()
         }
@@ -104,6 +115,10 @@ class OnboardingActivity : AppCompatActivity() {
         chipSuggestionKid = findViewById(R.id.chipSuggestionKid)
         usageStatus = findViewById(R.id.tvOnboardingUsageStatus)
         accessibilityStatus = findViewById(R.id.tvOnboardingAccessibilityStatus)
+        usageBody = findViewById(R.id.tvOnboardingUsageBody)
+        accessibilityBody = findViewById(R.id.tvOnboardingAccessibilityBody)
+        permissionWarning = findViewById(R.id.tvOnboardingPermissionWarning)
+        permissionNote = findViewById(R.id.tvOnboardingPermissionNote)
         btnGrantUsageAccess = findViewById(R.id.btnOnboardingUsageAccess)
         btnOpenAccessibility = findViewById(R.id.btnOnboardingAccessibility)
     }
@@ -136,10 +151,14 @@ class OnboardingActivity : AppCompatActivity() {
             }
         }
         btnGrantUsageAccess.setOnClickListener {
-            startActivity(UsageAccessHelper.createUsageAccessIntent())
+            launchPermissionGuide(
+                permissionGuidance.stateFor(PermissionRequirement.USAGE_ACCESS)
+            )
         }
         btnOpenAccessibility.setOnClickListener {
-            startActivity(Intent(Settings.ACTION_ACCESSIBILITY_SETTINGS))
+            launchPermissionGuide(
+                permissionGuidance.stateFor(PermissionRequirement.ACCESSIBILITY)
+            )
         }
     }
 
@@ -200,17 +219,39 @@ class OnboardingActivity : AppCompatActivity() {
     }
 
     private fun refreshPermissionState() {
-        applyPermissionStatus(usageStatus, UsageAccessHelper.hasUsageAccess(this))
-        applyPermissionStatus(accessibilityStatus, isAccessibilityEnabled())
+        val usageState = permissionGuidance.stateFor(PermissionRequirement.USAGE_ACCESS)
+        val accessibilityState = permissionGuidance.stateFor(PermissionRequirement.ACCESSIBILITY)
+        applyPermissionState(
+            state = usageState,
+            statusView = usageStatus,
+            bodyView = usageBody,
+            button = btnGrantUsageAccess
+        )
+        applyPermissionState(
+            state = accessibilityState,
+            statusView = accessibilityStatus,
+            bodyView = accessibilityBody,
+            button = btnOpenAccessibility
+        )
+        val hasMissingCorePermission = !usageState.isReady || !accessibilityState.isReady
+        permissionWarning.visibility = if (hasMissingCorePermission) View.VISIBLE else View.GONE
+        permissionNote.visibility = if (
+            Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU &&
+            !accessibilityState.isReady
+        ) {
+            View.VISIBLE
+        } else {
+            View.GONE
+        }
     }
 
     private fun trackPermissionMilestones() {
-        analyticsTracker.markUsageAccessGrantedIfNeeded(UsageAccessHelper.hasUsageAccess(this))
-        analyticsTracker.markAccessibilityEnabledIfNeeded(isAccessibilityEnabled())
-    }
-
-    private fun isAccessibilityEnabled(): Boolean {
-        return AccessibilityServiceState.isContentCaptureEnabled(this)
+        analyticsTracker.markUsageAccessGrantedIfNeeded(
+            permissionGuidance.stateFor(PermissionRequirement.USAGE_ACCESS).isReady
+        )
+        analyticsTracker.markAccessibilityEnabledIfNeeded(
+            permissionGuidance.stateFor(PermissionRequirement.ACCESSIBILITY).isReady
+        )
     }
 
     private fun completeOnboarding() {
@@ -242,10 +283,14 @@ class OnboardingActivity : AppCompatActivity() {
             analyticsTracker.logTesterProfileRegistered()
         }
         analyticsTracker.markOnboardingCompletedIfNeeded()
-        analyticsTracker.markUsageAccessGrantedIfNeeded(UsageAccessHelper.hasUsageAccess(this))
-        analyticsTracker.markAccessibilityEnabledIfNeeded(isAccessibilityEnabled())
+        analyticsTracker.markUsageAccessGrantedIfNeeded(
+            permissionGuidance.stateFor(PermissionRequirement.USAGE_ACCESS).isReady
+        )
+        analyticsTracker.markAccessibilityEnabledIfNeeded(
+            permissionGuidance.stateFor(PermissionRequirement.ACCESSIBILITY).isReady
+        )
         MonitoringScheduler.runSyncNow(applicationContext)
-        openDashboard()
+        openDashboard(permissionGuidance.hasUnresolvedCorePermissions())
     }
 
     private fun seedExistingValues(
@@ -265,30 +310,72 @@ class OnboardingActivity : AppCompatActivity() {
         }
     }
 
-    private fun openDashboard() {
+    private fun openDashboard(openManagePermissions: Boolean) {
+        val intent = if (openManagePermissions) {
+            MainActivity.createIntentForTab(
+                context = this,
+                tabId = R.id.nav_manage,
+                openSection = MainActivity.permissionSectionId()
+            )
+        } else {
+            Intent(this, MainActivity::class.java)
+        }
         startActivity(
-            Intent(this, MainActivity::class.java).apply {
+            intent.apply {
                 addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK)
             }
         )
         finish()
     }
 
-    private fun applyPermissionStatus(statusView: TextView, isReady: Boolean) {
-        statusView.text = if (isReady) {
-            getString(R.string.onboarding_permission_ready)
-        } else {
-            getString(R.string.onboarding_permission_missing)
-        }
+    private fun applyPermissionState(
+        state: PermissionGuideState,
+        statusView: TextView,
+        bodyView: TextView,
+        button: MaterialButton
+    ) {
+        statusView.text = state.statusText
         statusView.setBackgroundResource(
-            if (isReady) R.drawable.bg_pill_soft else R.drawable.bg_pill_orange
+            if (state.highlightStatus) R.drawable.bg_pill_orange else R.drawable.bg_pill_soft
         )
         statusView.setTextColor(
             ContextCompat.getColor(
                 this,
-                if (isReady) R.color.kw_on_primary_container else R.color.kw_on_surface
+                if (state.highlightStatus) R.color.kw_on_surface else R.color.kw_on_primary_container
             )
         )
+        bodyView.text = state.instructions
+        button.text = state.ctaText.orEmpty()
+        button.visibility = if (state.isReady || state.ctaAction == PermissionGuideAction.NONE) {
+            View.GONE
+        } else {
+            View.VISIBLE
+        }
+    }
+
+    private fun launchPermissionGuide(state: PermissionGuideState) {
+        val intent = PermissionGuideNavigator.createIntent(this, state.ctaAction) ?: return
+        permissionGuidance.markActionLaunched(state.ctaAction)
+        pendingGuideRequirement = state.requirement
+        pendingGuideAction = state.ctaAction
+        analyticsTracker.logPermissionGuideLaunched(
+            requirement = state.requirement.name.lowercase(),
+            step = state.ctaAction.analyticsValue
+        )
+        startActivity(intent)
+    }
+
+    private fun handlePendingPermissionReturn() {
+        val requirement = pendingGuideRequirement ?: return
+        val action = pendingGuideAction ?: return
+        val isGranted = permissionGuidance.stateFor(requirement).isReady
+        analyticsTracker.logPermissionGuideReturned(
+            requirement = requirement.name.lowercase(),
+            step = action.analyticsValue,
+            granted = isGranted
+        )
+        pendingGuideRequirement = null
+        pendingGuideAction = null
     }
 
     private companion object {

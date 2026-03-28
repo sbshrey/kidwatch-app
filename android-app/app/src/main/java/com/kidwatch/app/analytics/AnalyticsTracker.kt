@@ -131,6 +131,21 @@ class AnalyticsTracker(
         }
     }
 
+    fun logPermissionGuideLaunched(requirement: String, step: String) {
+        logEvent("permission_guide_launched") {
+            putString("requirement", requirement)
+            putString("step", step)
+        }
+    }
+
+    fun logPermissionGuideReturned(requirement: String, step: String, granted: Boolean) {
+        logEvent("permission_guide_returned") {
+            putString("requirement", requirement)
+            putString("step", step)
+            putLong("granted", if (granted) 1L else 0L)
+        }
+    }
+
     private fun logEvent(
         name: String,
         configure: Bundle.() -> Unit = {}

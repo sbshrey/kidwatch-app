@@ -20,6 +20,11 @@ Start with 5 families and track:
 - monitoring accuracy (usage minutes vs manual estimate)
 - privacy concerns (data fields reviewed with parents)
 
+Direct APK tester checklist:
+- Tell testers that Android 13 and above may require `App info -> Allow restricted settings` before Accessibility can be enabled for KidWatch.
+- After install, have testers confirm both Usage access and `KidWatch Content Monitor` in Accessibility before reporting a setup issue.
+- If Accessibility is still blocked, ask for the exact device model, Android version, and whether `Allow restricted settings` was visible in App info.
+
 Collect weekly feedback and prioritize:
 - false positives in risky labels
 - missing channels/videos

@@ -1307,52 +1307,135 @@
                         android:orientation="vertical"
                         android:visibility="gone">
 
-                        <LinearLayout
+                        <com.google.android.material.card.MaterialCardView
+                            android:id="@+id/cardManageUsageGuide"
                             android:layout_width="match_parent"
                             android:layout_height="wrap_content"
-                            android:orientation="horizontal">
+                            app:cardBackgroundColor="@color/kw_card_surface_alt"
+                            app:cardCornerRadius="20dp"
+                            app:cardElevation="0dp"
+                            app:strokeColor="@color/kw_outline_variant"
+                            app:strokeWidth="1dp">
 
-                            <com.google.android.material.button.MaterialButton
-                                android:id="@+id/btnManageUsageAccess"
-                                style="@style/Widget.Material3.Button.OutlinedButton"
-                                android:layout_width="0dp"
+                            <LinearLayout
+                                android:layout_width="match_parent"
                                 android:layout_height="wrap_content"
-                                android:layout_weight="1"
-                                android:text="@string/evidence_usage_button"
-                                app:icon="@drawable/ic_metric_clock"
-                                app:iconPadding="8dp"
-                                app:iconTint="@color/kw_on_surface" />
+                                android:orientation="vertical"
+                                android:padding="14dp">
 
-                            <com.google.android.material.button.MaterialButton
-                                android:id="@+id/btnManageCamera"
-                                style="@style/Widget.Material3.Button.OutlinedButton"
-                                android:layout_width="0dp"
-                                android:layout_height="wrap_content"
-                                android:layout_marginStart="10dp"
-                                android:layout_weight="1"
-                                android:text="@string/evidence_camera_button"
-                                app:icon="@drawable/ic_viewer_check"
-                                app:iconPadding="8dp"
-                                app:iconTint="@color/kw_on_surface" />
-                        </LinearLayout>
+                                <TextView
+                                    android:layout_width="match_parent"
+                                    android:layout_height="wrap_content"
+                                    android:text="@string/onboarding_usage_title"
+                                    android:textAppearance="@style/TextAppearance.Material3.TitleSmall"
+                                    android:textColor="@color/kw_on_surface" />
 
-                        <LinearLayout
-                            android:id="@+id/layoutManageManualPermissionRow2"
+                                <TextView
+                                    android:id="@+id/tvManageUsageStatus"
+                                    android:layout_width="wrap_content"
+                                    android:layout_height="wrap_content"
+                                    android:layout_marginTop="8dp"
+                                    android:background="@drawable/bg_pill_orange"
+                                    android:paddingStart="10dp"
+                                    android:paddingTop="7dp"
+                                    android:paddingEnd="10dp"
+                                    android:paddingBottom="7dp"
+                                    android:text="@string/onboarding_permission_missing"
+                                    android:textAppearance="@style/TextAppearance.Material3.LabelMedium"
+                                    android:textColor="@color/kw_on_surface" />
+
+                                <TextView
+                                    android:id="@+id/tvManageUsageBody"
+                                    android:layout_width="match_parent"
+                                    android:layout_height="wrap_content"
+                                    android:layout_marginTop="10dp"
+                                    android:textAppearance="@style/TextAppearance.Material3.BodySmall"
+                                    android:textColor="@color/kw_on_surface_variant"
+                                    tools:text="Open Usage access, find KidWatch in the list, and turn it on." />
+
+                                <com.google.android.material.button.MaterialButton
+                                    android:id="@+id/btnManageUsageAccess"
+                                    style="@style/Widget.Material3.Button.OutlinedButton"
+                                    android:layout_width="match_parent"
+                                    android:layout_height="wrap_content"
+                                    android:layout_marginTop="10dp"
+                                    android:text="@string/permission_usage_button"
+                                    app:icon="@drawable/ic_metric_clock"
+                                    app:iconPadding="8dp"
+                                    app:iconTint="@color/kw_on_surface" />
+                            </LinearLayout>
+                        </com.google.android.material.card.MaterialCardView>
+
+                        <com.google.android.material.button.MaterialButton
+                            android:id="@+id/btnManageCamera"
+                            style="@style/Widget.Material3.Button.OutlinedButton"
                             android:layout_width="match_parent"
                             android:layout_height="wrap_content"
                             android:layout_marginTop="10dp"
-                            android:orientation="horizontal">
+                            android:text="@string/evidence_camera_button"
+                            app:icon="@drawable/ic_viewer_check"
+                            app:iconPadding="8dp"
+                            app:iconTint="@color/kw_on_surface" />
 
-                            <com.google.android.material.button.MaterialButton
-                                android:id="@+id/btnManageAccessibility"
-                                style="@style/Widget.Material3.Button.OutlinedButton"
+                        <com.google.android.material.card.MaterialCardView
+                            android:id="@+id/cardManageAccessibilityGuide"
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            android:layout_marginTop="10dp"
+                            app:cardBackgroundColor="@color/kw_card_surface_alt"
+                            app:cardCornerRadius="20dp"
+                            app:cardElevation="0dp"
+                            app:strokeColor="@color/kw_outline_variant"
+                            app:strokeWidth="1dp">
+
+                            <LinearLayout
                                 android:layout_width="match_parent"
                                 android:layout_height="wrap_content"
-                                android:text="@string/evidence_accessibility_button"
-                                app:icon="@drawable/ic_accessibility_capture"
-                                app:iconPadding="8dp"
-                                app:iconTint="@color/kw_on_surface" />
-                        </LinearLayout>
+                                android:orientation="vertical"
+                                android:padding="14dp">
+
+                                <TextView
+                                    android:layout_width="match_parent"
+                                    android:layout_height="wrap_content"
+                                    android:text="@string/onboarding_accessibility_title"
+                                    android:textAppearance="@style/TextAppearance.Material3.TitleSmall"
+                                    android:textColor="@color/kw_on_surface" />
+
+                                <TextView
+                                    android:id="@+id/tvManageAccessibilityStatus"
+                                    android:layout_width="wrap_content"
+                                    android:layout_height="wrap_content"
+                                    android:layout_marginTop="8dp"
+                                    android:background="@drawable/bg_pill_orange"
+                                    android:paddingStart="10dp"
+                                    android:paddingTop="7dp"
+                                    android:paddingEnd="10dp"
+                                    android:paddingBottom="7dp"
+                                    android:text="@string/onboarding_permission_missing"
+                                    android:textAppearance="@style/TextAppearance.Material3.LabelMedium"
+                                    android:textColor="@color/kw_on_surface" />
+
+                                <TextView
+                                    android:id="@+id/tvManageAccessibilityBody"
+                                    android:layout_width="match_parent"
+                                    android:layout_height="wrap_content"
+                                    android:layout_marginTop="10dp"
+                                    android:textAppearance="@style/TextAppearance.Material3.BodySmall"
+                                    android:textColor="@color/kw_on_surface_variant"
+                                    tools:text="Open App info, allow restricted settings, then turn on KidWatch Content Monitor in Accessibility." />
+
+                                <com.google.android.material.button.MaterialButton
+                                    android:id="@+id/btnManageAccessibility"
+                                    style="@style/Widget.Material3.Button.OutlinedButton"
+                                    android:layout_width="match_parent"
+                                    android:layout_height="wrap_content"
+                                    android:layout_marginTop="10dp"
+                                    android:text="@string/permission_accessibility_button_open_settings"
+                                    app:icon="@drawable/ic_accessibility_capture"
+                                    app:iconPadding="8dp"
+                                    app:iconTint="@color/kw_on_surface" />
+                            </LinearLayout>
+                        </com.google.android.material.card.MaterialCardView>
                     </LinearLayout>
                 </LinearLayout>
             </com.google.android.material.card.MaterialCardView>
