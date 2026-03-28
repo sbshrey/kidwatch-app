@@ -1,0 +1,10 @@
+KidWatch debug build for trusted testers.
+
+Highlights:
+- Firebase App Distribution enabled for this repo
+- Permission recovery flow for direct-APK testers
+- Accessibility recovery now starts from App info on Android 13+
+
+Validation:
+- Built with `assembleDebug`
+- Verify install, Play Protect prompt, usage access, and accessibility flow on target devices

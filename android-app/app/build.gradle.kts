@@ -4,6 +4,7 @@ plugins {
     id("com.android.application")
     id("org.jetbrains.kotlin.android")
     id("com.google.devtools.ksp")
+    id("com.google.firebase.appdistribution")
     id("com.google.gms.google-services")
 }
 
@@ -15,6 +16,16 @@ val localProps = Properties().apply {
 }
 val openAiApiKey = (localProps.getProperty("OPENAI_API_KEY") ?: "").replace("\"", "\\\"")
 val testCohort = (localProps.getProperty("TEST_COHORT") ?: "manual-apk").replace("\"", "\\\"")
+val firebaseAppId = localProps.getProperty("FIREBASE_APP_ID")?.trim().orEmpty()
+val firebaseGroups = localProps.getProperty("FIREBASE_APP_DIST_GROUPS")?.trim().orEmpty()
+val firebaseCredentialsFile = localProps.getProperty("FIREBASE_APP_DIST_SERVICE_CREDENTIALS_FILE")?.trim().orEmpty()
+val firebaseTestersFile = rootProject.file(
+    localProps.getProperty("FIREBASE_APP_DIST_TESTERS_FILE")
+        ?.takeIf { it.isNotBlank() }
+        ?: "firebase-appdistribution/testers.txt"
+)
+val debugReleaseNotesFile = rootProject.file("firebase-appdistribution/release-notes-debug.txt")
+val releaseReleaseNotesFile = rootProject.file("firebase-appdistribution/release-notes-release.txt")
 
 android {
     namespace = "com.kidwatch.app"
@@ -53,6 +64,46 @@ android {
 
     kotlinOptions {
         jvmTarget = "17"
+    }
+}
+
+fun com.google.firebase.appdistribution.gradle.AppDistributionExtension.applyKidWatchDefaults(
+    artifactTypeValue: String,
+    notesFile: java.io.File
+) {
+    artifactType = artifactTypeValue
+    if (firebaseAppId.isNotBlank()) {
+        appId = firebaseAppId
+    }
+    if (notesFile.exists()) {
+        releaseNotesFile = notesFile.path
+    }
+    if (firebaseGroups.isNotBlank()) {
+        groups = firebaseGroups
+    }
+    if (firebaseTestersFile.exists()) {
+        testersFile = firebaseTestersFile.path
+    }
+    if (firebaseCredentialsFile.isNotBlank()) {
+        serviceCredentialsFile = firebaseCredentialsFile
+    }
+}
+
+android.buildTypes.named("debug").configure {
+    extensions.configure<com.google.firebase.appdistribution.gradle.AppDistributionExtension>("firebaseAppDistribution") {
+        applyKidWatchDefaults(
+            artifactTypeValue = "APK",
+            notesFile = debugReleaseNotesFile
+        )
+    }
+}
+
+android.buildTypes.named("release").configure {
+    extensions.configure<com.google.firebase.appdistribution.gradle.AppDistributionExtension>("firebaseAppDistribution") {
+        applyKidWatchDefaults(
+            artifactTypeValue = "APK",
+            notesFile = releaseReleaseNotesFile
+        )
     }
 }
 

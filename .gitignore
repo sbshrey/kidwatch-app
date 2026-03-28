@@ -22,6 +22,9 @@ android-app/.android/
 
 # Firebase config (local-only; keep out of git)
 android-app/app/google-services.json
+android-app/firebase-appdistribution/testers.txt
+android-app/firebase-appdistribution/groups.txt
+android-app/firebase-appdistribution/service-account.json
 
 # Optional: keep if generated later
 android-app/captures/

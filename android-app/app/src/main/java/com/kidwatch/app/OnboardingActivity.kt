@@ -4,11 +4,14 @@ import android.content.Intent
 import android.os.Build
 import android.os.Bundle
 import android.view.View
+import android.view.ViewGroup.MarginLayoutParams
 import android.widget.TextView
 import android.widget.ViewFlipper
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.content.ContextCompat
 import androidx.core.widget.NestedScrollView
+import androidx.core.view.ViewCompat
+import androidx.core.view.WindowInsetsCompat
 import com.google.android.material.button.MaterialButton
 import com.google.android.material.chip.Chip
 import com.google.android.material.textfield.TextInputEditText
@@ -32,6 +35,8 @@ class OnboardingActivity : AppCompatActivity() {
     private lateinit var dotOne: View
     private lateinit var dotTwo: View
     private lateinit var dotThree: View
+    private lateinit var onboardingHero: View
+    private lateinit var onboardingHeroMetricsRow: View
     private lateinit var heroBadge: TextView
     private lateinit var heroTitle: TextView
     private lateinit var heroBody: TextView
@@ -60,6 +65,7 @@ class OnboardingActivity : AppCompatActivity() {
     private val permissionGuidance by lazy { PermissionGuidance(this) }
     private var pendingGuideRequirement: PermissionRequirement? = null
     private var pendingGuideAction: PermissionGuideAction? = null
+    private var isKeyboardVisible: Boolean = false
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -79,6 +85,7 @@ class OnboardingActivity : AppCompatActivity() {
             viewFlipper.displayedChild = LAST_PAGE_INDEX
         }
         bindActions()
+        bindInsets()
         updateStepUi()
         refreshPermissionState()
         trackPermissionMilestones()
@@ -102,6 +109,8 @@ class OnboardingActivity : AppCompatActivity() {
         dotOne = findViewById(R.id.onboardingDotOne)
         dotTwo = findViewById(R.id.onboardingDotTwo)
         dotThree = findViewById(R.id.onboardingDotThree)
+        onboardingHero = findViewById(R.id.onboardingHero)
+        onboardingHeroMetricsRow = findViewById(R.id.onboardingHeroMetricsRow)
         heroBadge = findViewById(R.id.tvOnboardingHeroBadge)
         heroTitle = findViewById(R.id.tvOnboardingHeroTitle)
         heroBody = findViewById(R.id.tvOnboardingHeroBody)
@@ -123,10 +132,26 @@ class OnboardingActivity : AppCompatActivity() {
         btnOpenAccessibility = findViewById(R.id.btnOnboardingAccessibility)
     }
 
+    private fun bindInsets() {
+        ViewCompat.setOnApplyWindowInsetsListener(findViewById(android.R.id.content)) { _, insets ->
+            val imeVisible = insets.isVisible(WindowInsetsCompat.Type.ime())
+            if (imeVisible != isKeyboardVisible) {
+                isKeyboardVisible = imeVisible
+                applyHeroLayoutMode()
+            }
+            insets
+        }
+    }
+
     private fun bindActions() {
         chipSuggestionMom.setOnClickListener { nameInput.setText(chipSuggestionMom.text) }
         chipSuggestionDad.setOnClickListener { nameInput.setText(chipSuggestionDad.text) }
         chipSuggestionKid.setOnClickListener { nameInput.setText(chipSuggestionKid.text) }
+        listOf(nameInput, testerNameInput, testerPhoneInput).forEach { input ->
+            input.setOnFocusChangeListener { _, _ ->
+                applyHeroLayoutMode()
+            }
+        }
 
         btnSkip.setOnClickListener {
             if (viewFlipper.displayedChild < LAST_PAGE_INDEX) {
@@ -181,6 +206,7 @@ class OnboardingActivity : AppCompatActivity() {
             if (displayedChild == 2) R.drawable.bg_dot_active else R.drawable.bg_dot_inactive
         )
         renderHero(displayedChild)
+        applyHeroLayoutMode()
         onboardingScroll.post {
             onboardingScroll.scrollTo(0, 0)
         }
@@ -216,6 +242,42 @@ class OnboardingActivity : AppCompatActivity() {
         heroBody.setText(heroContent.bodyRes)
         heroMetricOne.setText(heroContent.metricOneRes)
         heroMetricTwo.setText(heroContent.metricTwoRes)
+    }
+
+    private fun applyHeroLayoutMode() {
+        val isTesterStep = viewFlipper.displayedChild == LAST_PAGE_INDEX
+        val collapseHero = isTesterStep && (isKeyboardVisible || isTesterFormFocused())
+        val compactHero = isTesterStep && !collapseHero
+
+        onboardingHero.visibility = if (collapseHero) View.GONE else View.VISIBLE
+        if (collapseHero) return
+
+        heroBody.visibility = if (compactHero) View.GONE else View.VISIBLE
+        onboardingHeroMetricsRow.visibility = if (compactHero) View.GONE else View.VISIBLE
+        heroTitle.maxLines = if (compactHero) 2 else Int.MAX_VALUE
+
+        heroTitle.setTextAppearance(
+            if (compactHero) {
+                com.google.android.material.R.style.TextAppearance_Material3_HeadlineSmall
+            } else {
+                com.google.android.material.R.style.TextAppearance_Material3_HeadlineLarge
+            }
+        )
+
+        (onboardingHero.layoutParams as? MarginLayoutParams)?.let { params ->
+            params.topMargin = dp(if (compactHero) 20 else 52)
+            onboardingHero.layoutParams = params
+        }
+        val heroPadding = dp(if (compactHero) 14 else 18)
+        onboardingHero.setPadding(heroPadding, heroPadding, heroPadding, heroPadding)
+    }
+
+    private fun dp(value: Int): Int {
+        return (value * resources.displayMetrics.density).toInt()
+    }
+
+    private fun isTesterFormFocused(): Boolean {
+        return nameInput.hasFocus() || testerNameInput.hasFocus() || testerPhoneInput.hasFocus()
     }
 
     private fun refreshPermissionState() {

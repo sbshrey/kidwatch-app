@@ -1,0 +1,7 @@
+KidWatch release candidate for trusted testers.
+
+Focus areas:
+- Install flow on non-Play devices
+- Usage access onboarding
+- Accessibility recovery and restricted-settings guidance
+- General stability and dashboard/session accuracy
